@@ -75,7 +75,6 @@ namespace Crash_Team_Mod
                 //reopen the cmd if it closes itself without reason
                 if (active_buildlist)
                 {
-
                     open_cmd();
 
                     if (!string.IsNullOrEmpty(game_ver))
@@ -135,44 +134,48 @@ namespace Crash_Team_Mod
             string python = Path.GetFullPath(".\\data\\tools\\Python\\Python310\\python.exe");
             string builder = Path.GetFullPath(".\\data\\tools\\mod-builder\\main.py");
 
-            // buidlist proccess
-            psx_cmd = new Process
-            {
-                StartInfo = new ProcessStartInfo
+
+
+           
+            
+                // buidlist proccess
+                psx_cmd = new Process
                 {
-                    FileName = "cmd.exe",
-                    Arguments = $"/K \"{python} \"\"{builder}\"\"\"",
-                    RedirectStandardInput = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,         // No shell
-                    CreateNoWindow = true           // No window
-
-
-
-                }
-            };
-
-
-            psx_cmd.OutputDataReceived += (sender, e) =>
-            {
-                if (!string.IsNullOrEmpty(e.Data))
-                {
-                    Invoke(new Action(() =>
+                    StartInfo = new ProcessStartInfo
                     {
-                        console_t.AppendText(e.Data + Environment.NewLine);
-                    }));
-                }
-            };
+                        FileName = "cmd.exe",
+                        Arguments = $"/K \"{python} \"\"{builder}\"\"\"",
+                        RedirectStandardInput = true,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true,
+                        UseShellExecute = false,         // No shell
+                        CreateNoWindow = true           // No window
 
 
-            psx_cmd.Start();
-            psx_cmd.BeginOutputReadLine();
-            psx_input = psx_cmd.StandardInput;
+
+                    }
+                };
 
 
-        }
+                psx_cmd.OutputDataReceived += (sender, e) =>
+                {
+                    if (!string.IsNullOrEmpty(e.Data))
+                    {
+                        Invoke(new Action(() =>
+                        {
+                            console_t.AppendText(e.Data + Environment.NewLine);
+                        }));
+                    }
+                };
 
+
+                psx_cmd.Start();
+                psx_cmd.BeginOutputReadLine();
+                psx_input = psx_cmd.StandardInput;
+
+
+            }
+        
 
 
 
@@ -310,7 +313,6 @@ namespace Crash_Team_Mod
 
             action = "refresh_iso";
             commands(action);
-            console_t.Text = String.Empty;
 
 
         }
@@ -338,8 +340,11 @@ namespace Crash_Team_Mod
                 rom.Text = romfile.FileName;
                 NAME_ROM = System.IO.Path.GetFileName(romfile.FileName);
                 ISO_PATH = System.IO.Directory.GetParent(romfile.FileName).FullName;
+
                 version_bool = true;
+
                 update_iso_folder();
+
             }
         }
 

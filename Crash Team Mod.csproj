@@ -77,7 +77,6 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
-    <Content Include="misil.ico" />
     <Content Include="potion.ico" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
