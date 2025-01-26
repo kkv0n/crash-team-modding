@@ -1,3 +1,0 @@
-american , LOAD_U.ARC , ARC/LOAD_U.ARC
-american , LOAD_U.BMP
-american , debug/redux.map

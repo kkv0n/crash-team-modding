@@ -1,0 +1,1 @@
+"../../tools/Python/Python310/python.exe" ../../../tools/startup/startup.py 1

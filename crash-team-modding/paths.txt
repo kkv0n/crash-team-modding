@@ -1,0 +1,7 @@
+COMPILE_LIST = ""
+MOD_NAME = ""
+MOD_DIR = ""
+GAME_NAME = ""
+ISO_PATH = ""
+NAME_ROM = ""
+PSX_DIR = ""

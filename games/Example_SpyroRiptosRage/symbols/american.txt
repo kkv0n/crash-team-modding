@@ -1,5 +1,0 @@
-sprintf = 0x800594ac;
-DrawText = 0x8004a374;
-
-speed = 0x8006a090;
-gameMode = 0x800681c8;

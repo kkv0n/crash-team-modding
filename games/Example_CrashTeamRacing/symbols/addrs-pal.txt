@@ -1,2 +1,0 @@
-gameMode = 0x8008D644;
-gamepadSystem = 0x8008D648;

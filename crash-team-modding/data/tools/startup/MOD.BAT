@@ -1,0 +1,1 @@
+"../../tools/Python/Python310/python.exe" ../../../../tools/mod-builder/main.py
