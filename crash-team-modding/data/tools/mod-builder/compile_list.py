@@ -30,7 +30,7 @@ class CompileList:
     def __init__(self, line: str, sym: Syms, prefix: str) -> None:
         self.original_line = line
         self.sym = sym
-        self.prefix = prefix # path prefix
+        self.prefix = pathlib.Path(prefix).resolve() # path prefix
         self.ignore = False
         self.is_bin = False
         self.path_build_list = None

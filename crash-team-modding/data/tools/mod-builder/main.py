@@ -12,10 +12,9 @@ from makefile import Makefile, clean_pch
 from compile_list import CompileList, free_sections, print_errors
 from syms import Syms
 from redux import Redux
-from common import MOD_NAME, GAME_NAME, LOG_FILE, COMPILE_LIST, DEBUG_FOLDER, BACKUP_FOLDER, OUTPUT_FOLDER, COMPILATION_RESIDUES, TEXTURES_FOLDER, TEXTURES_OUTPUT_FOLDER, IS_WINDOWS_OS, request_user_input, cli_clear, cli_pause, DISC_PATH, SETTINGS_PATH, COMPILE_FOLDER, GCC_ELF_FILE, MIPS_PATH, PATHS_FILE, reload_iso
+from common import MOD_NAME, GAME_NAME, LOG_FILE, COMPILE_LIST, DEBUG_FOLDER, BACKUP_FOLDER, OUTPUT_FOLDER, COMPILATION_RESIDUES, TEXTURES_FOLDER, TEXTURES_OUTPUT_FOLDER, IS_WINDOWS_OS, request_user_input, cli_clear, DISC_PATH, SETTINGS_PATH, COMPILE_FOLDER, GCC_ELF_FILE, MIPS_PATH, PATHS_FILE, PYTHON_PORTABLE, show_paths
 from mkpsxiso import Mkpsxiso
 from nops import Nops
-from game_options import game_options
 from image import create_images, clear_images, dump_images
 from clut import clear_cluts, dump_cluts
 from c import export_as_c
@@ -26,6 +25,7 @@ import pathlib
 import subprocess
 import sys
 from glob import glob
+import game_options
 
 logger = logging.getLogger(__name__)
 
@@ -35,8 +35,7 @@ class Main:
         self.redux = Redux()
         self.mkpsxiso = Mkpsxiso()
         self.nops = Nops()
-        self.nops.load_config()
-        self.redux.load_config(SETTINGS_PATH)
+        self.debug = show_paths
         self.actions = {
             'start_compile': self.compile,
             'clean_comp': self.clean_files,
@@ -53,18 +52,17 @@ class Main:
             13  :   self.redux.start_emulation, #not supported -penta3
             14  :   self.nops.hot_reload, # not supported -penta3
             15  :   self.nops.restore, # not supported -penta3
+            'show_paths': self.debug,
             'make_disasm': self.disasm,
             'export_texturesc': export_as_c,
-            18  :   self.clean_all, # unused
             'psx_exit': self.shutdown,
-            'refresh_iso': lambda: reload_iso(PATHS_FILE)
             
         }
         self.num_options = len(self.actions)
         """
         USE PORTABLE PYTHON PATH
         """
-        self.python = r"..\tools\Python\Python310\python.exe"
+        self.python = PYTHON_PORTABLE # unused ??
 
 
     def shutdown(self):
@@ -80,31 +78,13 @@ class Main:
 
     def get_options(self) -> int:
         intro_msg = """
-        Welcome to Crash Team Modding:
-            Modding for all people!
-            
-        Waiting for user selection...
-        
-        These are the available options
-        
-        Mods:
-        - Compile
-        - Clean Compilation files
-        - Build Modded ISO
-        - Extract Vanilla ISO
-        - Create xdelta patch
-        - Clean ISO files
-
-        Debug:
-        - Generate Disassemble Elf
-        - Export textures as C file
-        
-        'Programming you can do anything' :p lmao
+        v0.2 by penta3
+        Choose button to start.
         """
         while True:
             user_input = input(intro_msg + "\n: ").strip().lower()
 
-            
+                
             if len(user_input.split()) == 2:
                 command, state = user_input.split()
         
@@ -123,6 +103,7 @@ class Main:
 
             
             if user_input in self.actions:
+               
                 self.actions[user_input]()
             elif user_input == "quit":
                 print("Exiting program.")
@@ -134,7 +115,7 @@ class Main:
     def abort_compilation(self, is_warning: bool) -> None:
         if is_warning:
             logger.warning("Aborting ongoing compilations.")
-            cli_pause()
+            print(f"ERROR: Compilation Aborted")
 
     def compile(self) -> None:
         if not _files.check_file(COMPILE_LIST):
@@ -149,17 +130,20 @@ class Main:
                 if not cl.should_ignore():
                     make.add_cl(cl)
         if print_errors[0]:
-            intro_msg = "[Compile-py] Would you like to continue to compilation process?\n\n1 - Yes\n2 - No\n"
-            error_msg = "ERROR: Wrong option. Please type a number from 1-2.\n"
-            if request_user_input(first_option=1, last_option=2, intro_msg=intro_msg, error_msg=error_msg) == 2:
-                self.abort_compilation(is_warning=False)
+            compile_error = "ERROR: Compilation failed, check debug files"
+            print(compile_error)
+            self.abort_compilation(is_warning=True)
+                
         if make.build_makefile():
             if not make.make():
+                make_error = "ERROR: possible error when opening mod.elf/.map"
+                print(make_error)
                 self.abort_compilation(is_warning=True)
         else:
             self.abort_compilation(is_warning=True)
 
     def clean_files(self) -> None:
+        cli_clear()
         _files.delete_directory(DEBUG_FOLDER)
         _files.delete_directory(BACKUP_FOLDER)
         _files.delete_directory(OUTPUT_FOLDER)
@@ -171,9 +155,6 @@ class Main:
         for leftover in leftovers:
             _files.delete_file(leftover)
 
-    def clean_all(self) -> None:
-        self.mkpsxiso.clean(all=True)
-        self.clean_files()
 
     def patch_disc_files(self) -> None:
         self.redux.patch_disc_files(restore_files=False)
@@ -203,22 +184,21 @@ class Main:
         clear_cluts()
 
     def disasm(self) -> None:
-        path_in = GCC_ELF_FILE
-        path_out = DEBUG_FOLDER / 'disasm.txt'
+        path_in = os.path.abspath(GCC_ELF_FILE)
+        path_out = os.path.join(DEBUG_FOLDER, "disasm.txt")
         with open(path_out, "w") as file:
-            command = [MIPS_PATH + "/mipsel-none-elf-objdump", "-d", str(path_in)]
+            mips_diss = os.path.join(MIPS_PATH, "mipsel-none-elf-objdump")
+            command = [mips_diss, "-d", path_in]
             subprocess.call(command, stdout=file, stderr=subprocess.STDOUT)
         logger.info(f"Disassembly saved at {path_out}")
 
     def exec(self):
         while not _files.check_files([COMPILE_LIST, DISC_PATH, SETTINGS_PATH]):
-            cli_pause()
-        game_options.load_config()
+         print(f"ERROR: Cant find buildList.txt, disc.json or settings.json.")
+        game_options.gameoptions.load_config()
         while True:
-            cli_clear()
             i = self.get_options()
             self.actions[i]()
-            cli_pause()
 
 if __name__ == "__main__":
     try:

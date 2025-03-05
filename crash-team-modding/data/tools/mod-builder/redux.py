@@ -1,10 +1,9 @@
 import _files # check_file
 from syms import Syms
 from compile_list import CompileList, free_sections
-from common import COMPILE_LIST, ISO_PATH, REDUX_MAP_FILE, SETTINGS_PATH, BACKUP_FOLDER, TEXTURES_OUTPUT_FOLDER, MOD_NAME, request_user_input, get_build_id, cli_pause
+from common import COMPILE_LIST, ISO_PATH, REDUX_MAP_FILE, SETTINGS_PATH, BACKUP_FOLDER, TEXTURES_OUTPUT_FOLDER, MOD_NAME, request_user_input, get_build_id
 from image import get_image_list
 from clut import get_clut_list
-from game_options import game_options
 from mkpsxiso import Mkpsxiso
 from disc import Disc, DiscFile
 
@@ -15,6 +14,7 @@ import pathlib
 import requests
 import subprocess
 import sys
+import game_options
 
 logger = logging.getLogger(__name__)
 
@@ -51,13 +51,13 @@ class Redux:
             return False
 
     def get_game_name(self) -> str:
-        names = game_options.get_version_names()
+        names = game_options.gameoptions.get_version_names()
         intro_msg = "Select the game version:\n"
         for i, name in enumerate(names):
             intro_msg += f"{i + 1} - {name}\n"
         error_msg = f"ERROR: Invalid version. Please select a number from 1-{len(names)}."
         version = request_user_input(first_option=1, last_option=len(names), intro_msg=intro_msg, error_msg=error_msg)
-        out = game_options.get_gv_by_name(names[version - 1]).rom_name
+        out = game_options.gameoptions.get_gv_by_name(names[version - 1]).rom_name
 
         return out
 
@@ -68,7 +68,6 @@ class Redux:
             while not self.load_config(SETTINGS_PATH):
                 print("\n[Redux-py] Could not find a valid path to PCSX-Redux emulator.")
                 print("Please check your settings.json and provide a valid path to redux.\n")
-                cli_pause()
                 count_retries += 1
                 if 5 <= count_retries:
                     logger.critical("Max retries exeeced to find redux path. Exiting")
@@ -406,7 +405,7 @@ class Redux:
         print("\n[Redux-py] Comparing disc and patch file sizes...\n")
 
         # initialize disc and toolchain information
-        rom_name = instance_version.rom_name.split(".")[0]
+        rom_name = NAME_ROM.split(".")[0]
         extract_folder = ISO_PATH / rom_name
         xml = extract_folder.with_suffix(".xml")
         disc = Disc(instance_version.version)

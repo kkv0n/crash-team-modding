@@ -2,9 +2,11 @@
 import logging
 import pathlib
 import shutil
+import os
 
 logger = logging.getLogger(__name__)
 
+#unused
 def get_file_directory(fname = "config.json", folder = "games"):
     """
     Search each parent folder until the fname is found (if found at all)
@@ -20,9 +22,9 @@ def get_file_directory(fname = "config.json", folder = "games"):
     count_iterations = 0
     while (path_search != path_search.root):
         logger.debug(f"CWD Parent(x{count_iterations}): {path_search}")
-        if (path_search / fname).exists():
+        if (os.path.join(path_search, fname)).exists():
             return path_search
-        for path in (path_search / folder).rglob("*.json"): # hardcoded
+        for path in (os.path.join(path_search, folder)).rglob("*.json"): # hardcoded
             if path.name == fname:
                 return path.parent
         path_search = path_search.parent # move up one directory

@@ -1,9 +1,7 @@
-PREFIX ?= $(MIPSPATH)/mipsel-none-elf
+PREFIX ?= $(MIPS_PREFIX)
 FORMAT ?= elf32-littlemips
 
-
-
-ROOTDIR = $(TOOLSDIR)nugget/
+ROOTDIR = $(NUGGET_F)
 
 CC  = $(PREFIX)-gcc
 CXX = $(PREFIX)-g++
@@ -45,7 +43,7 @@ all: pch dep $(foreach ovl, $(OVERLAYSECTION), $(BINDIR)Overlay$(ovl))
 
 $(BINDIR)Overlay%: $(BINDIR)$(TARGET).elf
 	$(PREFIX)-objcopy -j $(@:$(BINDIR)Overlay%=%) -O binary $< $(BINDIR)$(TARGET)$(@:$(BINDIR)Overlay%=%)
-	$(TOOLSDIR)Python/Python310/python.exe $(TOOLSDIR)trimbin/trimbin.py $(BINDIR)$(TARGET)$(@:$(BINDIR)Overlay%=%) $(BUILDDIR) $(TRIMBIN_OFFSET)
+	$(PYTHON_P) $(TRIMBINPY) $(BINDIR)$(TARGET)$(@:$(BINDIR)Overlay%=%) $(BUILDDIR) $(TRIMBIN_OFFSET)
 
 $(BINDIR)$(TARGET).elf: $(OBJS)
 ifneq ($(strip $(BINDIR)),)
@@ -54,13 +52,7 @@ endif
 	$(CC) -o $(BINDIR)$(TARGET).elf $(OBJS) $(LDFLAGS)
 
 $(info CC=$(CC))
-$(info ROOTDIR=$(ROOTDIR))
-$(info TOOLSDIR=$(TOOLSDIR))
-$(info TRIMBIN_OFFSET=$(TRIMBIN_OFFSET))
-$(info BINDIR=$(BINDIR))
-$(info MAKEFILE_LIST=$(MAKEFILE_LIST))
 $(info TARGET=$(TARGET))
-$(info COMMONPATH=$(COMMONPATH))
 $(info OBJS=$(OBJS))
 $(info LDFLAGS=$(LDFLAGS))
 

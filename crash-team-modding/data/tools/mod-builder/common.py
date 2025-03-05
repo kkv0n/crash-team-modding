@@ -10,6 +10,7 @@ import sys
 import textwrap
 import _files
 from pathlib import Path
+import importlib
 
 
 
@@ -37,15 +38,15 @@ def load_portable_paths(file_path):
                     if key == "ISO_PATH":
                         ISO_PATH = pathlib.Path(value)
                     elif key == "COMPILE_LIST":
-                        COMPILE_LIST = value
+                        COMPILE_LIST = os.path.abspath(value)
                     elif key == "MOD_NAME":
                         MOD_NAME = value
                     elif key == "MOD_DIR":
-                        MOD_DIR = value
+                        MOD_DIR = os.path.abspath(value)
                     elif key == "GAME_NAME":
                         GAME_NAME = value
                     elif key == "PSX_DIR":
-                        PSX_DIR = value
+                        PSX_DIR = os.path.abspath(value)
                     elif key == "NAME_ROM":
                         NAME_ROM = value
     except FileNotFoundError:
@@ -54,11 +55,11 @@ def load_portable_paths(file_path):
         print(f"Error loading paths: {e}")
         
         
-        # call to load paths from .txt
+# call to load paths from .txt
 load_portable_paths(PATHS_FILE)
 
-COMPILE_FOLDER = pathlib.Path(COMPILE_LIST).parent
-MAKEFILE = COMPILE_FOLDER / "Makefile"
+COMPILE_FOLDER = Path(os.path.abspath(COMPILE_LIST)).parent
+MAKEFILE = os.path.join(COMPILE_FOLDER, "Makefile")
 
 logging.basicConfig(level = logging.DEBUG)
 logger = logging.getLogger(__name__)
@@ -68,32 +69,12 @@ def find_main_folder(fname, start_folder):
 
     current_folder = pathlib.Path(start_folder).resolve()
     while current_folder != current_folder.parent:  
-        file_path = current_folder / fname
-        if file_path.exists():
+        file_path = os.path.join(current_folder, fname)
+        if os.path.exists(file_path):
             return current_folder  
         current_folder = current_folder.parent
     return None
 
-def reload_iso(file_path):
-    """Reload iso path from txt file."""
-    global ISO_PATH, NAME_ROM
-    try:
-        with open(file_path, "r") as file:
-            for line in file:
-                line = line.strip()
-                if "=" in line:  
-                    key, value = line.split("=", 1)
-                    key = key.strip()
-                    value = value.strip().strip('"')  # delete (")
-                    if key == "ISO_PATH":
-                        ISO_PATH = pathlib.Path(value)
-                    elif key == "NAME_ROM":
-                        NAME_ROM = value
-
-    except FileNotFoundError:
-        print(f"Error: the file '{file_path}' dont exist.")
-    except Exception as e:
-        print(f"Error updating iso path: {e}")
         
 def extract_build_id(list_tokens):
     """
@@ -112,7 +93,7 @@ def get_build_id(fname = MAKEFILE) -> int:
     """
     path_file = pathlib.Path(fname)
     if not path_file.exists():
-        logger.debug(f"Makefile no encontrado en {path_file}")
+        logger.debug(f"Makefile not found {path_file}")
         return None
     with open(path_file, "r") as file:
         for line in file:
@@ -123,18 +104,7 @@ def get_build_id(fname = MAKEFILE) -> int:
 remaining_args = copy.deepcopy(sys.argv[1:])
 using_cl_args = len(sys.argv) > 1
 
-def cli_pause() -> None:
-    """
-    Continues to prompt user unless they manually kill it.
-    TODO: Replace with click()
-    TODO: Give the user the option to exit
-    """
-    if using_cl_args:
-        if len(remaining_args) == 0:
-            sys.exit(0)
-    else:
-        print("Press Enter to continue...")
-        input()
+
 
 IS_WINDOWS_OS = sys.platform == "win32"
 """
@@ -142,68 +112,83 @@ FILE PATHS
 """
 LOG_FILE = "crash.log"
 CONFIG_FILE = "config.json"
-DIR_GAME = find_main_folder("config.json", COMPILE_FOLDER)
-DECOMPILE = DIR_GAME / "decompile"
-CONFIG_PATH = DIR_GAME / CONFIG_FILE
+DIR_GAME = find_main_folder(CONFIG_FILE, COMPILE_FOLDER)
+
+
+CONFIG_PATH = os.path.join(DIR_GAME, CONFIG_FILE)
 logger.debug(f"FOLDER_DISTANCE: {DIR_GAME}")
 logger.debug(f"CWD: {pathlib.Path.cwd()}")
 DISTANCE_LENGTH = str(DIR_GAME).count("/") + 1
 
-DIR_SYMBOLS = DIR_GAME / "symbols"
-PLUGIN_PATH = DIR_GAME / "plugins"
-GAME_INCLUDE_PATH = DIR_GAME / "include"
-MOD_PATH = DIR_GAME / "mods"
-MAKEFILE = COMPILE_FOLDER / "Makefile"
-OVERLAYLD = COMPILE_FOLDER / "overlay.ld"
+
+
+"""
+UNUSED
+"""
+SLASH = os.sep
+"""
+UNUSED
+"""
+
+
+
+
+DIR_SYMBOLS = os.path.join(DIR_GAME, "symbols")
+PLUGIN_PATH = os.path.join(DIR_GAME, "plugins")
+GAME_INCLUDE_PATH = os.path.join(DIR_GAME, "include")
+MOD_PATH = os.path.join(DIR_GAME, "mods")
+OVERLAYLD = os.path.join(COMPILE_FOLDER, "overlay.ld")
 FILE_LIST = "fileList.txt"
 SRC_FOLDER = "src/"
-OUTPUT_FOLDER = COMPILE_FOLDER / "output"
-BACKUP_FOLDER = COMPILE_FOLDER / "backup"
-DEBUG_FOLDER = COMPILE_FOLDER / "debug" 
-OBJ_FOLDER = DEBUG_FOLDER / "obj/"
-DEP_FOLDER = DEBUG_FOLDER / "dep/"
-COMP_SOURCE = DEBUG_FOLDER / "source.txt"
+OUTPUT_FOLDER = os.path.join(COMPILE_FOLDER, "output")
+BACKUP_FOLDER = os.path.join(COMPILE_FOLDER, "backup")
+DEBUG_FOLDER = os.path.join(COMPILE_FOLDER, "debug") 
+OBJ_FOLDER = os.path.join(DEBUG_FOLDER, "obj", "")
+DEP_FOLDER = os.path.join(DEBUG_FOLDER, "dep", "")
+COMP_SOURCE = os.path.join(DEBUG_FOLDER, "source.txt")
 TEXTURES_FOLDER = pathlib.Path("newtex")
-TEXTURES_OUTPUT_FOLDER = TEXTURES_FOLDER / "output"
-MAP_INIT_PATH = COMPILE_FOLDER / "mod.map"
-ELF_INIT_PATH = COMPILE_FOLDER / "mod.elf"
-GCC_MAP_FILE = DEBUG_FOLDER / "mod.map"
-GCC_ELF_FILE = DEBUG_FOLDER / "mod.elf"
-GCC_OUT_FILE = DEBUG_FOLDER / "gcc_out.txt"
-TRIMBIN_OFFSET = DEBUG_FOLDER / "offset.txt"
+TEXTURES_OUTPUT_FOLDER = os.path.join(TEXTURES_FOLDER, "output")
+MAP_INIT_PATH = os.path.join(COMPILE_FOLDER, "mod.map")
+ELF_INIT_PATH = os.path.join(COMPILE_FOLDER, "mod.elf")
+GCC_MAP_FILE = os.path.join(DEBUG_FOLDER, "mod.map")
+GCC_ELF_FILE = os.path.join(DEBUG_FOLDER, "mod.elf")
+GCC_OUT_FILE = os.path.join(DEBUG_FOLDER, "gcc_out.txt")
+TRIMBIN_OFFSET = os.path.join(DEBUG_FOLDER, "offset.txt")
 COMPILATION_RESIDUES = [OVERLAYLD, MAKEFILE, "comport.txt"]
-REDUX_MAP_FILE = DEBUG_FOLDER / "redux.map"
-SETTINGS_FILE = PSX_DIR + "/data/settings.json"
-SETTINGS_PATH = SETTINGS_FILE
+REDUX_MAP_FILE = os.path.join(DEBUG_FOLDER, "redux.map")
+SETTINGS_FILE = os.path.join(PSX_DIR, "data", "settings.json")
+SETTINGS_PATH = os.path.abspath(SETTINGS_FILE)
 DISC_FILE = "disc.json"
-DISC_PATH = DIR_GAME / DISC_FILE
-TOOLS_PATH = PSX_DIR + "/data/tools"
-MIPS_PATH = TOOLS_PATH + "/mips/bin"
+DISC_PATH = os.path.join(DIR_GAME, DISC_FILE)
+TOOLS_PATH = os.path.join(PSX_DIR, "data", "tools")
+MIPS_PATH = os.path.join(TOOLS_PATH, "mips", "bin")
+PYTHON_PORTABLE = os.path.join(TOOLS_PATH, "Python", "Python310", "python.exe")
 COMMENT_SYMBOL = "//"   
-"""
-DEBUG LOGS WHEN YOU
-OPEN THE SCRIPT, NEEDED
-TO VERIFY IF THE PATHS
-ARE CORRECT
-"""     
-logger.debug(f"DIR_GAME: {DIR_GAME}")
-logger.debug(f"MOD_DIR: {MOD_DIR}")
-logger.debug(f"MOD_NAME: {MOD_NAME}")
-logger.debug(f"COMPILATION_RESIDUES: {COMPILATION_RESIDUES}")
-logger.debug(f"GCC_MAP_FILE: {GCC_MAP_FILE}")
-logger.debug(f"CONFIG_PATH: {CONFIG_PATH}")
-logger.debug(f"DEBUG_FOLDER: {DEBUG_FOLDER}")
-logger.debug(f"GAME_NAME: {GAME_NAME}")
-logger.debug(f"MIPS_PATH: {MIPS_PATH}")
-logger.debug(f"COMPILE_LIST: {COMPILE_LIST}")
-logger.debug(f"TRIMBIN_OFFSET: {TRIMBIN_OFFSET}")
-logger.debug(f"SETTINGS_PATH: {SETTINGS_PATH}")
-logger.debug(f"PSX_DIR: {PSX_DIR}")
-
-
-
 
 HEXDIGITS = ["A", "B", "C", "D", "E", "F"]
+
+def show_paths():
+    """
+    DEBUG LOGS WHEN YOU
+    OPEN THE SCRIPT, NEEDED
+    TO VERIFY IF THE PATHS
+    ARE CORRECT
+    """     
+    logger.debug(f"DIR_GAME: {DIR_GAME}")
+    logger.debug(f"MOD_DIR: {MOD_DIR}")
+    logger.debug(f"MOD_NAME: {MOD_NAME}")
+    logger.debug(f"COMPILATION_RESIDUES: {COMPILATION_RESIDUES}")
+    logger.debug(f"GCC_MAP_FILE: {GCC_MAP_FILE}")
+    logger.debug(f"CONFIG_PATH: {CONFIG_PATH}")
+    logger.debug(f"DEBUG_FOLDER: {DEBUG_FOLDER}")
+    logger.debug(f"GAME_NAME: {GAME_NAME}")
+    logger.debug(f"MIPS_PATH: {MIPS_PATH}")
+    logger.debug(f"COMPILE_LIST: {COMPILE_LIST}")
+    logger.debug(f"COMPILE_FOLDER: {COMPILE_FOLDER}")
+    logger.debug(f"TRIMBIN_OFFSET: {TRIMBIN_OFFSET}")
+    logger.debug(f"SETTINGS_PATH: {SETTINGS_PATH}")
+    logger.debug(f"PSX_DIR: {PSX_DIR}")
+    logger.debug(f"OBJ_FOLDER: {OBJ_FOLDER}")
 
 def request_user_input(first_option: int, last_option: int, intro_msg: str, error_msg: str) -> int:
     """

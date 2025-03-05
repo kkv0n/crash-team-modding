@@ -7,7 +7,7 @@ TODO: Use subprocess instead of os.system
 
 from compile_list import CompileList
 import _files # create_directory, delete_file
-from common import cli_clear, MAKEFILE, TRIMBIN_OFFSET, GCC_OUT_FILE, COMP_SOURCE, GAME_INCLUDE_PATH, CONFIG_PATH, SRC_FOLDER, DEBUG_FOLDER, OUTPUT_FOLDER, BACKUP_FOLDER, OBJ_FOLDER, DEP_FOLDER, GCC_MAP_FILE, REDUX_MAP_FILE, CONFIG_PATH, MOD_NAME, MOD_DIR, OVERLAYLD, PSX_DIR, COMPILE_FOLDER, GCC_ELF_FILE, MAP_INIT_PATH, ELF_INIT_PATH, MIPS_PATH
+from common import cli_clear, MAKEFILE, TRIMBIN_OFFSET, GCC_OUT_FILE, COMP_SOURCE, GAME_INCLUDE_PATH, CONFIG_PATH, SRC_FOLDER, DEBUG_FOLDER, OUTPUT_FOLDER, BACKUP_FOLDER, OBJ_FOLDER, DEP_FOLDER, GCC_MAP_FILE, REDUX_MAP_FILE, CONFIG_PATH, MOD_NAME, MOD_DIR, OVERLAYLD, PSX_DIR, COMPILE_FOLDER, GCC_ELF_FILE, MAP_INIT_PATH, ELF_INIT_PATH, MIPS_PATH, TOOLS_PATH, PYTHON_PORTABLE, SLASH, PATHS_FILE
 
 import logging
 import json
@@ -15,6 +15,7 @@ import os
 import shutil
 import subprocess
 import textwrap
+import shlex
 from time import time
 
 # import pdb # debugging
@@ -26,7 +27,7 @@ def clean_pch() -> None:
         data = json.load(file)["compiler"]
         if "pch" in data:
             pch = data["pch"] + ".gch"
-            _files.delete_file(GAME_INCLUDE_PATH / pch)
+            _files.delete_file(os.path.join(GAME_INCLUDE_PATH, pch))
 
 class Makefile:
     def __init__(self, build_id: int, files_symbols: list[str]) -> None:
@@ -140,11 +141,13 @@ class Makefile:
     def build_makefile(self) -> bool:
         self.set_base_address()
         self.build_makefile_objects()
+        srcs_str = " ".join([i for i in self.srcs])
+        PCHS_PREV = os.path.join(GAME_INCLUDE_PATH, self.pch)
         buffer = f"""
-        MODDIR := {str(COMPILE_FOLDER)}
+        MODDIR := {os.path.abspath(COMPILE_FOLDER)}
         TARGET = mod
 
-        SRCS = {" ".join([i for i in self.srcs])}
+        SRCS := {srcs_str}
         CPPFLAGS = -DBUILD={self.build_id}
         LDSYMS = {" ".join(f"-T{str(sym)}" for sym in self.files_symbols)}
 
@@ -154,19 +157,29 @@ class Makefile:
         OVERLAYSECTION ?= {" ".join(self.ovr_section)}
         OVR_START_ADDR = {hex(self.base_addr)}
         OVERLAYSCRIPT = {self.build_linker_script()}
-        BUILDDIR = {str(OUTPUT_FOLDER)}
-        GAMEINCLUDEDIR = {str(GAME_INCLUDE_PATH)}
+        BUILDDIR = {os.path.abspath(OUTPUT_FOLDER)}
+        GAMEINCLUDEDIR = {os.path.abspath(GAME_INCLUDE_PATH)}
         EXTRA_CC_FLAGS = {self.compiler_flags}
         OPT_CC_FLAGS = {self.opt_ccflags}
         OPT_LD_FLAGS = {self.opt_ldflags}
-        PCHS = {str(GAME_INCLUDE_PATH/self.pch)}
-        TRIMBIN_OFFSET = {str(TRIMBIN_OFFSET)}
+        PCHS = {PCHS_PREV}
+        TRIMBIN_OFFSET = {os.path.abspath(TRIMBIN_OFFSET)}
         BUILD_ID = {self.build_id}
+        MIPS_P = {os.path.join(MIPS_PATH, "mipsel-none-elf")}
+        PSXDIR = {os.path.abspath(PSX_DIR)}
+        PYTHON_PORTABLE = {os.path.abspath(PYTHON_PORTABLE)}
+        TRIMBIN_F = {os.path.join(TOOLS_PATH, "trimbin", "trimbin.py")}
+        NUGGET_COMMON = {os.path.join(TOOLS_PATH, "nugget", "common.mk")}
+        NUGGET_FOLDER = {os.path.join(TOOLS_PATH, "nugget")}
+        NUGGET_MACROS = {os.path.join(TOOLS_PATH, "nugget", "common", "macros")}
+        MINI_INCLUDE = {os.path.join(TOOLS_PATH, "minin00b", "include")}
+        MINI_LIB = {os.path.join(TOOLS_PATH, "minin00b", "lib")}
+        PSYQ_INCLUDE = {os.path.join(TOOLS_PATH, "gcc-psyq-converted", "include")}
+        PSYQ_LIB = {os.path.join (TOOLS_PATH, "gcc-psyq-converted", "lib")}
+        TOOLS_PATH = {os.path.abspath(TOOLS_PATH)}
         -include define.mk
-        PSXDIR = {str(PSX_DIR)}
-        MIPSPATH = {str(MIPS_PATH)}
-        COMMONPATH = {str(PSX_DIR)}/data
-        include $(COMMONPATH)/common.mk
+
+        include {os.path.join(os.path.join(PSX_DIR, 'data'), 'common.mk')}
         """
 
         with open(MAKEFILE, "w") as file:
@@ -188,8 +201,8 @@ class Makefile:
                 obj_path = src.with_suffix(".o")
                 dep_path = src.with_suffix(".dep")
                 if _files.check_file(obj_path) and _files.check_file(dep_path):
-                    obj_dst = OBJ_FOLDER / obj_path.name
-                    dep_dst = DEP_FOLDER / dep_path.name
+                    obj_dst = os.path.join(OBJ_FOLDER, obj_path.name)
+                    dep_dst = os.path.join(DEP_FOLDER, dep_path.name)
                     buffer += f"{obj_dst} {obj_path}\n"
                     buffer += f"{dep_dst} {dep_path}\n"
                     shutil.move(obj_path, obj_dst)
@@ -219,9 +232,10 @@ class Makefile:
         print(f"Compiling: {MOD_NAME}...")
         start_time = time()
         try:
-            command = [MIPS_PATH + "/make", "-j8", "--silent"] # TODO: Point to the CWD directory
+            mips_make = os.path.join(MIPS_PATH, "make")
+            command = [mips_make, "-j8", "--silent"]
             with open(GCC_OUT_FILE, "w") as outfile:
-                result = subprocess.run(command, stdout=outfile, stderr=subprocess.STDOUT, cwd=str(COMPILE_FOLDER))
+                result = subprocess.run(command, stdout=outfile, stderr=subprocess.STDOUT, cwd=COMPILE_FOLDER)
                 if result.returncode != 0:
                     print(f"Error: Compilation failed, look at the log file {GCC_OUT_FILE}")
                     logger.critical(f"Compilation failed. See {GCC_OUT_FILE}")
@@ -242,7 +256,7 @@ class Makefile:
             self.move_temp_files()
             self.delete_temp_files()
             logger.critical(f"Compilation completed but unsuccessful. ({total_time}s)")
-            print(f"Error: Compilation unsuccessful, it can be because a wrong path for mod.elf/.map ({total_time}s)")
+            print(f"Error: Compilation unsuccessful ({total_time}s)")
             return False
 
         shutil.move(MAP_INIT_PATH, GCC_MAP_FILE)

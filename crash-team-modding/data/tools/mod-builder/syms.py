@@ -1,8 +1,8 @@
 from __future__ import annotations # to use type in python 3.7
 
 import _files # check_file
-from common import request_user_input, is_number
-from game_options import game_options
+from common import request_user_input, is_number, PATHS_FILE
+import game_options
 
 import logging
 
@@ -34,25 +34,34 @@ class Syms():
     def ask_user_for_version(self, build_id: int = None):
         
         if build_id is not None:
-            return game_options.get_gv_by_build_id(build_id)
-        names = game_options.get_version_names()
+            return game_options.gameoptions.get_gv_by_build_id(build_id)
+        names = game_options.gameoptions.get_version_names()
 
         
         for version, state in self.VERSION_STATES.items():
             if state:
                 
                 version_number = self.VERSION_COMMANDS.get(version)
-                return game_options.get_gv_by_name(names[version_number - 1])
+                return game_options.gameoptions.get_gv_by_name(names[version_number - 1])
         
         
         
-        intro_msg = "Select the game version:\n"
-        for i, name in enumerate(names):
-            intro_msg += f"{i + 1} - {name}\n"
-        error_msg = f"ERROR: Invalid version. Please select a number from 1-{len(names)}."
-        self.version = request_user_input(first_option=1, last_option=len(names), intro_msg=intro_msg, error_msg=error_msg)
-        return game_options.get_gv_by_name(names[self.version - 1])
-
+        try:
+            with open(PATHS_FILE, "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if "=" in line:  
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip().strip('"')  # delete (")
+                        if key == "ROM_REGION":
+                            ROM_REGION = int(value)
+                            return game_options.gameoptions.get_gv_by_name(names[ROM_REGION - 1])
+                            
+        except FileNotFoundError:
+            print(f"Error: the file '{PATHS_FILE}' dont exist.")
+        except Exception as e:
+            print(f"Error loading game region: {e}")
 
     def parse_gcc_file(self, fname: str) -> None:
         """

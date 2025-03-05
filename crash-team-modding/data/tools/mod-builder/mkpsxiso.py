@@ -1,17 +1,16 @@
 """
-TODO: Replace with Click
-pyxdelta doesn't support pathlib
-Assume all plugins.py don't support pathlib
-plugins assume os.sep is there
+TO DO: RESTORE GAME_OPTIONS --PENTA3
 """
-# im not going to modify this just to use ctr-tools functions, who cares
+# im not going to modify this just to use ctr-tools rebuild functions, who cares
 
 import _files # check_file, delete_file, create_directory, delete_directory
-from common import ISO_PATH, MOD_NAME, OUTPUT_FOLDER, COMPILE_LIST , FILE_LIST , MOD_DIR, PLUGIN_PATH, request_user_input, cli_pause, get_build_id, COMPILE_FOLDER
-from game_options import game_options
+import common
+from common import ISO_PATH, MOD_NAME, OUTPUT_FOLDER, COMPILE_LIST , FILE_LIST , MOD_DIR, PLUGIN_PATH, request_user_input, get_build_id, COMPILE_FOLDER, NAME_ROM, PATHS_FILE, cli_clear
+
 from disc import Disc
 from compile_list import CompileList, free_sections
 from syms import Syms
+from pathlib import Path
 
 import importlib
 import logging
@@ -23,6 +22,7 @@ import pymkpsxiso
 import shutil
 import sys
 import xml.etree.ElementTree as et
+import game_options
 logger = logging.getLogger(__name__)
 
 MB = 1024 * 1024
@@ -39,33 +39,45 @@ shutil.copyfileobj = _copyfileobj_patched # overwrites a class method directly (
 
 class Mkpsxiso:
     def __init__(self) -> None:
-        path = PLUGIN_PATH / "plugin.py"
+        path = os.path.join(PLUGIN_PATH, "plugin.py")
         spec = importlib.util.spec_from_file_location("plugin", path)
         self.plugin = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.plugin)
 
+        
     def find_iso(self, instance_version) -> bool:
-        if not _files.check_file(ISO_PATH / instance_version.rom_name):
-            print(f"Please insert your {instance_version.version} game in {ISO_PATH} and rename it to {instance_version.rom_name}")
+        if not _files.check_file(os.path.join(ISO_PATH, NAME_ROM)):
+            print(f"Please insert your {instance_version.version} game in {ISO_PATH} and rename it to {NAME_ROM}")
             return False
         return True
 
     def ask_user_for_version(self):
-        names = game_options.get_version_names()
+        names = game_options.gameoptions.get_version_names()
         for version, state in Syms.VERSION_STATES.items():
             if state:
                 
                 version_number = Syms.VERSION_COMMANDS.get(version)
-                return game_options.get_gv_by_name(names[version_number - 1])
+                return game_options.gameoptions.get_gv_by_name(names[version_number - 1])
                 
                 
                 
-        intro_msg = "Select the game version:\n"
-        for i, name in enumerate(names):
-            intro_msg += f"{i + 1} - {name}\n"
-        error_msg = f"ERROR: Invalid version. Please select a number from 1-{len(names)}."
-        version = request_user_input(first_option=1, last_option=len(names), intro_msg=intro_msg, error_msg=error_msg)
-        return game_options.get_gv_by_name(names[version - 1])
+
+        try:
+            with open(PATHS_FILE, "r") as file:
+                for line in file:
+                    line = line.strip()
+                    if "=" in line:  
+                        key, value = line.split("=", 1)
+                        key = key.strip()
+                        value = value.strip().strip('"')  # delete (")
+                        if key == "ROM_REGION":
+                            ROM_REGION = int(value)
+                            return game_options.gameoptions.get_gv_by_name(names[ROM_REGION - 1])
+
+        except FileNotFoundError:
+            print(f"Error: the file '{PATHS_FILE}' dont exist.")
+        except Exception as e:
+            print(f"Error loading game region: {e}")
 
     def extract_iso_to_xml(self, instance_version, dir_out, fname_out: str) -> None:
         """
@@ -73,30 +85,22 @@ class Mkpsxiso:
             because we don't know if the pymkpsxiso or self.plugin support pathlib yet
 
         """
-        has_iso = self.find_iso(instance_version)
-        count_retries = 0
-        while (not has_iso):
-            cli_pause()
-            has_iso = self.find_iso(instance_version)
-            count_retries += 1
-            if 5 <= count_retries:
-                logger.critical("Max retries exeeced to find iso. Exiting")
-                sys.exit(9)
-        rom_path = ISO_PATH / instance_version.rom_name
+        rom_path = os.path.join(ISO_PATH, NAME_ROM)
         _files.create_directory(dir_out)
         # TODO: Find out if the plugin and pymk... support pathlib
-        pymkpsxiso.dump(str(rom_path), f"{str(dir_out)}{os.sep}", str(fname_out))
-        self.plugin.extract(f"{str(PLUGIN_PATH)}{os.sep}", f"{str(dir_out)}{os.sep}", f"{instance_version.version}")
+        pymkpsxiso.dump(rom_path, str(dir_out), str(fname_out))
+        self.plugin.extract(f"{Path(PLUGIN_PATH)}{os.sep}", f"{Path(dir_out)}{os.sep}", f"{instance_version.version}")
 
     def abort_build_request(self) -> bool:
-        """ TODO: Replace with click """
-        intro_msg = """
-        Abort iso build?
-        1 - Yes
-        2 - No
+        iso_error = """
+        ERROR:
+        ISO BUILD ABORTED,
+        CHECK YOUR ROM PATH
         """
-        error_msg = "Invalid input. Please type a number from 1-2."
-        return request_user_input(first_option=1, last_option=2, intro_msg=intro_msg, error_msg=error_msg) == 1
+        
+        print(iso_error)
+        
+        return True
 
     def patch_iso(self, version: str, build_id: int, dir_in_build, modified_rom_name: str, fname_xml: str) -> bool:
         """
@@ -109,10 +113,10 @@ class Mkpsxiso:
         iso_changed = False
         xml_tree = et.parse(fname_xml)
         dir_tree = xml_tree.findall(".//directory_tree")[0]
-        build_lists = ["./"] # cwd
+        build_lists = [COMPILE_FOLDER] # cwd
         while build_lists:
             prefix = build_lists.pop(0)
-            bl = (pathlib.Path(prefix) / COMPILE_LIST).resolve() # TODO: Double check
+            bl = (os.path.join(prefix, COMPILE_LIST)) # NOT SURE ABOUT THIS, CAN BE WRONG!
             free_sections()
             with open(bl, "r") as file:
                 for line in file:
@@ -136,7 +140,7 @@ class Mkpsxiso:
                             continue
 
                         # checking whether the original file exists and retrieving its size
-                        game_file = dir_in_build / df.physical_file
+                        game_file = os.path.join(dir_in_build, df.physical_file)
                         if not _files.check_file(game_file):
                             if self.abort_build_request():
                                 return False
@@ -160,7 +164,7 @@ class Mkpsxiso:
                         with open(mod_file, "rb") as mod:
                             mod_data = bytearray(mod.read())
                         if game_file not in modded_files:
-                            modified_game_file = dir_in_build / df.physical_file
+                            modified_game_file = os.path.join(dir_in_build, df.physical_file)
                             modded_stream = open(modified_game_file, "r+b") # BUG: Should this be closed?
                             modded_files[game_file] = [modded_stream, bytearray(modded_stream.read())]
                             iso_changed = True
@@ -180,12 +184,12 @@ class Mkpsxiso:
                         filename_len = len(filename)
                         if filename_len > 12:
                             filename = filename[(filename_len - 12):] # truncate
-                        mod_file = OUTPUT_FOLDER + instance_cl.section_name + ".bin"
-                        dst = dir_in_build / filename
+                        mod_file = os.path.join(OUTPUT_FOLDER, instance_cl.section_name + ".bin")
+                        dst = os.path.join(dir_in_build, filename)
                         shutil.copyfile(mod_file, dst)
                         contents = {
                             "name": filename,
-                            "source": modified_rom_name + "/" + filename,
+                            "source": os.path.join(modified_rom_name, filename),
                             "type": "data"
                         }
                         element = et.Element("file", contents)
@@ -213,7 +217,7 @@ class Mkpsxiso:
                     new_element = et.Element('file')
                     discName = srcName.split('/')[-1]
                     new_element.set('name',discName)
-                    new_element.set('source',modified_rom_name + '/' + discName)
+                    new_element.set('source',os.path.join(modified_rom_name, discName))
                     new_element.set('type','data')
                     new_element.tail = '\n\t\t'
                     element.append(new_element)
@@ -228,27 +232,30 @@ class Mkpsxiso:
                 element.attrib[key] = element_source
         xml_tree.write(fname_out)
 
+    def extract_game(self, string1, string2, string3) -> None:
+        self.extract_iso_to_xml(string1, string2, string3)
+        
+        
     def build_iso(self, only_extract=False) -> None:
+
         instance_version = self.ask_user_for_version()
         last_compiled_version = get_build_id()
         if last_compiled_version is not None and instance_version.build_id != last_compiled_version:
-            print(f"WARNING: iso build was requested for version: {instance_version.version} but last compiled version was: {game_options.get_gv_by_build_id(last_compiled_version.version).version}. ")
+            print(f"WARNING: iso build was requested for version: {instance_version.version} but last compiled version was: {game_options.gameoptions.get_gv_by_build_id(last_compiled_version.version).version}. ")
             print(f"This could mean that some output files may contain data for the wrong version, resulting in a corrupted disc.")
             if self.abort_build_request():
                 return
-        rom_name = instance_version.rom_name.split(".")[0]
-        extract_folder = ISO_PATH / rom_name
-        xml = extract_folder.with_suffix(".xml")
-        if only_extract:
-            self.extract_iso_to_xml(instance_version, extract_folder, xml)
+        rom_name = Path(NAME_ROM).stem
+        extract_folder = os.path.join(ISO_PATH, rom_name)
+        xml = f"{extract_folder}.xml"
+        self.extract_game(instance_version, extract_folder, xml)
+        if only_extract or not _files.check_file(COMPILE_LIST):
             return
-        if not _files.check_file(COMPILE_LIST):
-            return
-        if not pathlib.Path(xml).exists(): # don't need to log error
-            self.extract_iso_to_xml(instance_version, extract_folder, xml)
+
+           
         modified_rom_name = f"{rom_name}_{MOD_NAME}"
-        build_files_folder = ISO_PATH / modified_rom_name
-        new_xml = build_files_folder.with_suffix(".xml")
+        build_files_folder = os.path.join(ISO_PATH, modified_rom_name)
+        new_xml = f"{build_files_folder}.xml"
         _files.delete_directory(build_files_folder)
         print(f"Copying files.")
         shutil.copytree(extract_folder, build_files_folder)
@@ -256,9 +263,9 @@ class Mkpsxiso:
         extraFiles = []
 
         #check for optional fileList.txt
-        if os.path.exists(MOD_DIR + FILE_LIST):
+        if os.path.exists(os.path.join(MOD_DIR, FILE_LIST)):
             logger.info("Adding files from fileList.txt ...")
-            with open(MOD_DIR + FILE_LIST, 'r') as file:
+            with open(os.path.join(MOD_DIR, FILE_LIST, 'r')) as file:
                 lines = file.readlines()
             for line in lines:
                 cleaned_line = line.strip().replace(' ', '').replace('\t','')
@@ -270,15 +277,15 @@ class Mkpsxiso:
 
                     if len(words) < 3:
                         extraFiles.append(srcFile)
-                        shutil.copyfile(MOD_DIR + srcFile, build_files_folder / words[1].split('/')[-1])
+                        shutil.copyfile(os.path.join(MOD_DIR, srcFile, build_files_folder, words[1].split('/')[-1]))
                     else:
-                        shutil.copyfile(MOD_DIR + srcFile, build_files_folder / words[2])
+                        shutil.copyfile(os.path.join(MOD_DIR, srcFile, build_files_folder, words[2]))
         
 
         print(f"Converting XML...")
         self.convert_xml(xml, new_xml, modified_rom_name,extraFiles)
-        build_bin = build_files_folder.with_suffix(".bin")
-        build_cue = build_files_folder.with_suffix(".cue")
+        build_bin = f"{build_files_folder}.bin"
+        build_cue = f"{build_files_folder}.cue"
         logger.info("Patching files...")
         if self.patch_iso(instance_version.version, instance_version.build_id, build_files_folder, modified_rom_name, new_xml):
             print(f"Building iso...")
@@ -290,10 +297,12 @@ class Mkpsxiso:
             print(f"Error: No files changed, ISO building was skipped")
 
     def xdelta(self) -> None:
+        cli_clear()
         instance_version = self.ask_user_for_version()
-        original_game = ISO_PATH / instance_version.rom_name
-        mod_name = instance_version.rom_name.split(".")[0] + "_" + MOD_NAME
-        modded_game = ISO_PATH / (mod_name + ".bin")
+        original_game = os.path.join(ISO_PATH, NAME_ROM)
+        rom_name = Path(NAME_ROM).stem
+        mod_name = f"{rom_name}_{MOD_NAME}"
+        modded_game = os.path.join(ISO_PATH, f"{mod_name}.bin")
         if not _files.check_file(original_game):
             print(f"Make sure your vanilla rom is in {ISO_PATH}.")
             return
@@ -301,25 +310,24 @@ class Mkpsxiso:
             print(f"Make sure you builded your modded rom before trying to generate a xdelta patch.")
             return
         print(f"Generating xdelta patch...")
-        output = ISO_PATH / (mod_name + ".xdelta")
+        output = os.path.join(ISO_PATH, f"{mod_name}.xdelta")
         pyxdelta.run(str(original_game), str(modded_game), str(output))
         print(f"{output} generated!")
 
-    def clean(self, all=False) -> None:
-        for version in game_options.get_version_names():
-            instance_version = game_options.get_gv_by_name(version)
-            rom_name = instance_version.rom_name.split(".")[0]
-            modified_rom_name = rom_name + "_" + MOD_NAME
-            build_files_folder = ISO_PATH / modified_rom_name
-            build_cue = build_files_folder.with_suffix(".cue")
-            build_bin = build_files_folder.with_suffix(".bin")
-            build_xml = build_files_folder.with_suffix(".xml")
-            build_xdelta = build_files_folder.with_suffix(".xdelta")
-            if all:
-                extract_xml = ISO_PATH / (rom_name + ".xml")
-                extract_folder = ISO_PATH / extract_xml.stem
-                _files.delete_directory(extract_folder)
-                _files.delete_file(extract_xml)
+    def clean(self) -> None:    
+        cli_clear()        
+        for version in game_options.gameoptions.get_version_names():
+            instance_version = game_options.gameoptions.get_gv_by_name(version)
+            rom_name = Path(NAME_ROM).stem
+            modified_rom_name = f"{rom_name}_{MOD_NAME}"
+            build_files_folder = os.path.join(ISO_PATH, modified_rom_name)
+            build_cue = f"{build_files_folder}.cue"
+            build_bin = f"{build_files_folder}.bin"
+            build_xml = f"{build_files_folder}.xml"
+            build_xdelta = f"{build_files_folder}.xdelta"
+
+            extract_xml = f"{rom_name}.xml"
+            extract_folder = os.path.join(ISO_PATH, rom_name)
             _files.delete_directory(build_files_folder)
             _files.delete_file(build_bin)
             _files.delete_file(build_cue)

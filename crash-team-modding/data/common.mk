@@ -1,17 +1,17 @@
-# PYTHON PORTABLE
-PYTHON = $(TOOLSDIR)Python/Python310/python.exe
-
-
+PYTHON_P = $(PYTHON_PORTABLE)
+MIPS_PREFIX = $(MIPS_P)
+TRIMBINPY = $(TRIMBIN_F)
 THISDIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
-TOOLSDIR = $(PSXDIR)/data/tools/
+TOOLSDIR = $(TOOLS_PATH)
+NUGGET_F = $(NUGGET_FOLDER)
 
-CPPFLAGS += -I$(TOOLSDIR)nugget/common/macros/
+CPPFLAGS += -I$(NUGGET_MACROS)
 CPPFLAGS += -I$(GAMEINCLUDEDIR)
 CPPFLAGS += -I$(MODDIR)
 
 ifeq ($(USE_MININOOB),true)
-  CPPFLAGS += -I$(TOOLSDIR)minin00b/include/
-  LDFLAGS += -L$(TOOLSDIR)minin00b/lib/
+  CPPFLAGS += -I$(MINI_INCLUDE)
+  LDFLAGS += -L$(MINI_LIB)minin00b/lib/
   LDFLAGS += -Wl,--start-group
   LDFLAGS += -l:libc.a
   LDFLAGS += -l:psxcd.a
@@ -26,8 +26,8 @@ ifeq ($(USE_MININOOB),true)
 endif
 
 ifeq ($(USE_PSYQ),true)
-  CPPFLAGS += -I$(TOOLSDIR)gcc-psyq-converted/include/
-  LDFLAGS += -L$(TOOLSDIR)gcc-psyq-converted/lib/
+  CPPFLAGS += -I$(PSYQ_INCLUDE)
+  LDFLAGS += -L$(PSYQ_LIB)
   LDFLAGS += -Wl,--start-group
   LDFLAGS += -lapi
   LDFLAGS += -lc
@@ -54,4 +54,4 @@ ifeq ($(USE_PSYQ),true)
   LDFLAGS += -Wl,--end-group
 endif
 
-include $(TOOLSDIR)nugget/common.mk
+include $(NUGGET_COMMON)

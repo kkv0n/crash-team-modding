@@ -12,82 +12,119 @@ using System.IO;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using System.Threading;
 using System.Reflection;
+using Microsoft.VisualBasic.FileIO;
+using Crash_Team_Mod_Header;
+using static Crash_Team_Mod_Header.modding;
+using System.Windows.Forms.VisualStyles;
+using System.Xml;
 
 
 namespace Crash_Team_Mod
 {
-
     public partial class CTM : Form
     {
-        private Process psx_cmd;
-        private StreamWriter psx_input;
+        modding mod = new modding();
 
-        //important strings
-        string PATHS_FILE = @".\paths.txt";
-        string COMPILE_LIST;
-        string MOD_NAME;
-        string MOD_DIR;
-        string ISO_PATH;
-        string NAME_ROM;
-        string PREV_PSX_DIR = System.IO.Directory.GetCurrentDirectory();
-        string PSX_DIR;
-        string debug_path;
-        string action;
-        string game_ver;
-        string task_text;
+        const byte _NULL = 0;
 
 
         public CTM()
         {
+            
+
             InitializeComponent();
             buttons();
+            print_welcome();
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.gui_closing);
             romfile.Filter = "CTR ROM (*.bin) | *.bin; | All files (*.*) | *.*";
+            duckexe.Filter = "DUCKSTATION (*.exe) | *.exe;";
+            modelfile.Filter = "CTR MODEL FILE (*.ply, *.ctr) | *.ply;*.ctr";
+            lngfile.Filter = "CTR LANGUAGE FILE (*.lng, *.txt) | *.lng;*.txt";
+            xafile.Filter = "CTR XA AUDIO FILE (*.XA) | *.XA;";
+
             romfile.FilterIndex = 1;
-            PSX_DIR = PREV_PSX_DIR.Replace("\\", "/");
+            duckexe.FilterIndex = 1;
+            modelfile.FilterIndex = 1;
+            lngfile.FilterIndex = 1;
+            xafile.FilterIndex = 1;
+
+            //fill the strings
+            mod.PREV_PSX_DIR = System.IO.Directory.GetCurrentDirectory();
+            mod.PATHS_FILE = @".\paths.txt";
+            mod.BACKUP_FOLDER = @"C:\ctr-mod-files";
+            mod.TEMP_SDK = Path.Combine(mod.BACKUP_FOLDER, "CTR-MOD-SDK");
+            mod.PSX_DIR = mod.PREV_PSX_DIR.Replace("\\", "/");
+            mod.PSX_TOOLS_PATH = Path.Combine(Path.Combine(mod.PREV_PSX_DIR, "data"), "tools");
+            mod.CTR_TOOLS_PATH = Path.Combine(mod.PSX_TOOLS_PATH, "ctr-tools");
+            mod.BIGTOOL = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "bigtool.exe"));
+
+            //execute this in real time
             System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
             timer.Interval = 1500;
-            timer.Tick += (sender, e) => check_proccess(); //always check if the buildlist are open
+            timer.Tick += (sender, e) => check_process(); //always check if the buildlist are open
             timer.Start();
 
         }
 
-
-        //bool to make sure game version is already selected
-        bool version_bool = false;
-
         //to avoid cmd closing after a task finished
         bool active_buildlist = false;
 
+        bool temp_sdk = false;
 
 
+        void print_welcome()
+        {
+            console_t.AppendText(@"
+
+        Welcome to Crash Team Modding:
+            Modding for all people!
+            
+        Waiting for a Buildlist...
+        
+        These are the available options
+        
+        Mods:
+        - Compile
+        - Clean Compilation files
+        - Build Modded ISO
+        - Extract Vanilla ISO
+        - Create xdelta patch
+        - Clean ISO files
+
+        Debug:
+        - Generate Disassemble Elf
+        - Export textures as C file
+        - Open ROM with duckstation
+        
+        Ctr-tools:
+        - Extract
+        - Rebuild
+        - Generate xdelta
+        
+        Advanced:
+        - Convert Character Models
+           ->.ply -> .ctr -> .obj
+           
+        - Convert lang files
+            .lng <-> .txt
+            
+        - Open XA files
+
+" + Environment.NewLine);
+
+        }
 
 
         //check if the cmd is open
-        public void check_proccess()
+        public void check_process()
         {
-            if (psx_cmd != null && !psx_cmd.HasExited)
-            {
+            if (enable_mod.Checked) psx_execute((byte)psx.CLOSE);
+
+            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited) {
                 return;
             }
-            else
-            {
-                //reopen the cmd if it closes itself without reason
-                if (active_buildlist)
-                {
-                    open_cmd();
-
-                    if (!string.IsNullOrEmpty(game_ver))
-                    {
-                        action = game_ver;
-                        version_bool = true;
-                        commands(action);
-                    }
-                }
-                else
-                {
-                    console_t.Text = string.Empty;
-                }
+            else { 
+                psx_execute((byte)psx.RELOAD);
             }
         }
 
@@ -96,110 +133,352 @@ namespace Crash_Team_Mod
         //close cmd when the app is closed
         void gui_closing(object sender, FormClosingEventArgs e)
         {
-            close_cmd();
-        }
+            if ((GET_MODDIR != null) && (temp_sdk))
 
-
-
-
-        void restart_cmd()
-        {
-            psx_cmd.Kill();
-            Process.Start("taskkill", $"/F /IM cmd.exe");
-        }
-
-
-
-
-        //closing the cmd
-        void close_cmd()
-        {
-            if (psx_cmd != null && !psx_cmd.HasExited)
             {
-                psx_cmd.Kill();
+                mod.COMPILE_LIST = Path.Combine(mod.BACKUP_MODDIR, "buildList.txt");
+                mod.MOD_DIR = mod.BACKUP_MODDIR;
+                change_paths((byte)paths.WRITE_PATHS);
             }
-
-            active_buildlist = false;
-
-            Process.Start("taskkill", $"/F /IM cmd.exe");
+            if (mod.NAME_ROM != null)
+            {
+                string romname = mod.NAME_ROM.Replace(".bin", "");
+                if (Directory.Exists(Path.Combine(mod.ISO_PATH, romname)))
+                {
+                    Directory.Delete(Path.Combine(mod.ISO_PATH, romname), true);
+                    File.Delete(Path.Combine(mod.ISO_PATH, romname + ".xml"));
+                }
+            }
+            psx_execute((byte)psx.CLOSE); 
         }
 
 
 
 
 
-        //open buildlist (paths are given by paths.txt)
-        void open_cmd()
+
+
+
+
+
+        //open the buildlist
+        void open_python()
         {
-            string python = Path.GetFullPath(".\\data\\tools\\Python\\Python310\\python.exe");
-            string builder = Path.GetFullPath(".\\data\\tools\\mod-builder\\main.py");
 
 
+            // in framework 3.5 you can only combine 2 paths with path.combine
+            string python = Path.GetFullPath(Path.Combine(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "Python"), "Python310"), "python.exe"));
+            string builder = Path.GetFullPath(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "mod-builder"), "main.py"));
 
-           
-            
-                // buidlist proccess
-                psx_cmd = new Process
+            //the gui can get frozen without this for some reason
+            int selectionStart =console_t.SelectionStart;
+            bool autoScroll = console_t.SelectionStart == console_t.Text.Length;
+
+            mod.psx_cmd = new Process
+            {
+                StartInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
+                    FileName = python,
+                    Arguments = $"\"{builder}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    RedirectStandardInput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
+                }
+            };
+
+            mod.psx_cmd.OutputDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                {
+                    console_t.Invoke((Action)(() => console_t.AppendText(e.Data + Environment.NewLine)));
+                    if (autoScroll) //avoid gui crashes
                     {
-                        FileName = "cmd.exe",
-                        Arguments = $"/K \"{python} \"\"{builder}\"\"\"",
-                        RedirectStandardInput = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,         // No shell
-                        CreateNoWindow = true           // No window
-
-
-
+                        console_t.SelectionStart = console_t.Text.Length;
+                        console_t.ScrollToCaret(); 
                     }
-                };
-
-
-                psx_cmd.OutputDataReceived += (sender, e) =>
-                {
-                    if (!string.IsNullOrEmpty(e.Data))
+                    else
                     {
-                        Invoke(new Action(() =>
+                        console_t.SelectionStart = selectionStart; 
+                    }
+                }
+            };
+
+            mod.psx_cmd.ErrorDataReceived += (sender, e) =>
+            {
+                if (!string.IsNullOrEmpty(e.Data))
+                    console_t.Invoke((Action)(() => console_t.AppendText($"[cmd] {e.Data}" + Environment.NewLine)));
+            };
+
+            mod.psx_cmd.Start();
+            mod.psx_cmd.BeginOutputReadLine();
+            mod.psx_cmd.BeginErrorReadLine();
+            mod.psx_input = mod.psx_cmd.StandardInput;
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        string GET_MODDIR;  //original mod(no temp) folder
+
+        //  cmd process
+        void psx_execute(byte todo)
+        {
+            switch (todo)
+            {
+
+
+                case (byte)psx.CLOSE:
+                    {
+                        if (mod.psx_cmd != null && !mod.psx_cmd.HasExited)
                         {
-                            console_t.AppendText(e.Data + Environment.NewLine);
-                        }));
+                            psx_execute((byte)psx.RESTART);
+                            console_t.Text = string.Empty;
+                        }
+
+                        active_buildlist = false;
+                        
+                        break;
                     }
-                };
 
 
-                psx_cmd.Start();
-                psx_cmd.BeginOutputReadLine();
-                psx_input = psx_cmd.StandardInput;
 
+                case (byte)psx.RESTART:
+                    {
+                       // if (mod.psx_cmd != null && !mod.psx_cmd.HasExited) mod.psx_cmd.Kill();
+
+                        foreach (Process python_process in Process.GetProcessesByName("python"))
+                        { 
+                            python_process.Kill();
+                            mod.psx_input.Close();
+                            python_process.WaitForExit();
+                            
+                        }
+
+                        console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine);
+                        break;
+                    }
+
+                case ((byte)psx.TEMP_PATH):
+                    {
+                        GET_MODDIR = System.IO.Directory.GetParent(mod.COMPILE_LIST).FullName;
+
+                        psx_execute((byte)psx.SEARCH_SDK);
+
+                        if (mod.PREV_SDK.Contains(" "))
+                        {
+                            if (Directory.Exists(mod.BACKUP_MODDIR))
+                            {
+                                Directory.Delete(mod.BACKUP_MODDIR, true);
+                            }
+
+                            if (!Directory.Exists(mod.BACKUP_FOLDER))
+                            System.IO.Directory.CreateDirectory(mod.BACKUP_FOLDER);
+
+                            MessageBox.Show("your folder contains spaces, creating a temp folder... pls wait" + mod.TEMP_SDK);
+                            FileSystem.CopyDirectory(mod.PREV_SDK, mod.TEMP_SDK, true);
+                            temp_sdk = true;
+
+                        }
+                        else
+                        {
+                            temp_sdk = false;
+                        }
+
+                        break;
+                    }
+
+                case ((byte)psx.DUCK):
+                    {
+                        if (mod.DUCK_PATH == null)
+                        {
+                            switch_gui((byte)gui.SET_DUCK_PATH);
+                            return;
+                        }
+
+                        string romname = mod.NAME_ROM.Replace(".bin", "");
+                        string executable = mod.DUCK_PATH;
+                        mod.DESIRED_ROM = (!rebuild_rom) ?
+                        Path.Combine(mod.ISO_PATH, romname + "_" + mod.MOD_NAME + ".bin")  : mod.MODDED_ROM;
+
+                        if (!File.Exists(mod.DESIRED_ROM))
+                        {
+                            MessageBox.Show("cant find the rom:" + mod.DESIRED_ROM);
+                            return;
+                        }
+
+                        string args = $"-batch \"{mod.DESIRED_ROM}\"";
+
+                        execute_process(6, executable, args, mod.PREV_PSX_DIR);
+
+                        break;
+                    }
+
+                case (byte)psx.OPEN:
+                    {
+                        if (rom.Text == null)
+                        {
+                            MessageBox.Show("pls select a rom first");
+                            return;
+                        }
+
+                        psx_execute((byte)psx.RESTART);
+                        open_python();
+
+                        break;
+                    }
+
+
+                case (byte)psx.SEARCH_SDK:
+                    {
+                        string search_file = "config.json";  //search this file in back folders
+                        string search_folder = Path.GetFullPath(GET_MODDIR); //buildlist folder
+
+                        while (!String.IsNullOrEmpty(search_folder))
+                        {
+                            string[] search_all = Directory.GetFiles(search_folder, search_file);
+
+                            if (search_all.Length > 0)
+                            {
+                                mod.PREV_SDK = search_folder;
+                                return;
+                            }
+
+                            search_folder = Directory.GetParent(search_folder)?.FullName;
+                        }
+
+                        if (mod.PREV_SDK == null)
+                        {
+                            MessageBox.Show("Cant find SDK folder, make sure you downloaded it correctly");
+
+                        }
+                        break;
+
+                    }
+
+
+                case (byte)psx.RELOAD:
+                    {
+                        if (active_buildlist)
+                        {
+                            psx_execute((byte)psx.OPEN);
+                        }
+
+                        break;
+                    }
 
             }
-        
+            if (todo >= (byte)psx.COMPILE)
+            {
+                commands(todo);
+                if (todo == (byte)psx.CLEAN_C)
+                {
+                    console_t.Text = String.Empty;
+                    print_welcome();
+                }
+            }
+        }
 
 
 
 
         //write commands in the cmd using app buttons
-        void commands(string action)
+        void commands(byte command) //TO DO: MERGE ROM COMMANDS WITH PSX COMMANDS
         {
-            if (psx_cmd != null && !psx_cmd.HasExited)
+            if ((temp_sdk) && (command < (byte)region.CTR_USA)) //refresh the temp sdk with latest changes in the folder
             {
-                psx_input.WriteLine(action);
-                psx_input.Flush();
+                foreach (var moddir in Directory.GetFileSystemEntries(mod.BACKUP_MODDIR)) //copy temp mod folder
+                {
+     
+                    if (Path.GetFileName(moddir) == "buildList.txt") //skip buildList because it breaks the program
+                    {
+                        continue;
+                    }
+
+        
+                    string files = Path.Combine(mod.MOD_DIR, Path.GetFileName(moddir));
+
+           
+                    if (File.Exists(moddir))
+                    {
+                        File.Copy(moddir, files, true); 
+                    }
+          
+                    else if (Directory.Exists(moddir))
+                    {
+                        Directory.CreateDirectory(files);
+                        foreach (var file in Directory.GetFiles(moddir))
+                        {
+                            File.Copy(file, Path.Combine(files, Path.GetFileName(file)), true);
+                        }
+                    }
+                }
+
+                MessageBox.Show("temp folder was updated!");
+
+
+                
+
+
             }
-            else
+
+
+            string[] ACTION = { "start_compile", "clean_comp", "mod_build", "clean_iso", "mod_xdelta", "mod_extract",
+                "make_disasm", "export_texturesc", "sel_usa true", "sel_pal true", "sel_jap true", "sel_proto true",
+                "sel_japtrial true"};
+
+            if (command >= (byte)region.CTR_USA)
             {
-                if (!version_bool)
-                {
-                    // only show warning if this is not called by version buttons
-                    MessageBox.Show("The console is not open, first drag a buildlist in the square at the right side.");
-                }
-                else
-                {
-                    version_bool = false;
-                }
+                byte region = (byte)((command - (byte)psx.TEXTURES) & 0xFF);
+                mod.ROM_REGION = region.ToString(); //this will be saved in paths.txt
             }
+
+            command = (byte)((command - (byte)psx.COMPILE) & 0xFF);// match numbers with the array
+
+            string[] TASK_TEXT = { "STARTING COMPILATION...", "CLEANING COMPILATION FILES...",
+            "BUILDING ROM...", "CLEANING OLD ROM FILES...", "MAKING XDELTA...", "EXTRACTING ROM FILES...",
+            "GENERATING DISASSEMBLY.ELF, LOOK IN DEBUG FOLDER...", "EXPORTING TEXTURES...", "NTSC-U SELECTED",
+            "PAL SELECTED", "NTSC-J SELECTED", "PROTO SEP 3 SELECTED", "JAPAN TRIAL SELECTED"
+            };
+
+
+            if ((mod.psx_cmd == null || mod.psx_cmd.HasExited)) //if cmd is closed
+            {
+                byte operation = (byte)(((byte)region.CTR_USA - (byte)psx.COMPILE) & 0xFF);
+
+                // only show warning if this is not called by version buttons
+                if (command < operation)MessageBox.Show("The console is not open, first drag a buildlist in the square at the right side.");
+
+                return;
+
+            }
+
+
+
+            mod.psx_input.WriteLine(ACTION[command]);
+            console_t.AppendText(TASK_TEXT[command] + Environment.NewLine);
+            mod.psx_input.Flush();
+
+
+
+
         }
 
 
@@ -207,14 +486,19 @@ namespace Crash_Team_Mod
 
 
 
-        //unused in beta
+        //block non ctr tools functions
         void buttons()
         {
+            bool swap_buttons = enable_mod.Checked;
+            var cmdbuttons = new[] {
+            comp_b, cleanc_b, cleanr_b, buildc_b, exc_b, xd_b,dis_b, log_b, tex_b, psx_r, usa_b, pal_b, jap_b,
+            sep3_b, jtrial_b};
+            var toolbuttons = new[] { rebuild_toolsb, ext_toolsb, xdelta_toolsb, adv_toolsb, };
 
-            var allowedButtons = (enable_mod.Checked) ? new[] { mod1, mod2, mod3, mod4, search_rom }
-            : new[] { dis_b, tex_b, log_b, comp_b, cleanc_b, buildc_b, exc_b, xd_b, cleanr_b, psx_r,
-            romv1, romv2, romv3, search_rom};
 
+
+                drag_buildlist.Enabled = (swap_buttons) ? false : true;
+                prev_settingsb.Enabled = (swap_buttons) ? false : true;
 
 
             //block modding buttons if the checkbox is not enabled
@@ -222,41 +506,45 @@ namespace Crash_Team_Mod
             {
                 if (control is System.Windows.Forms.Button button)
                 {
-                    if (!allowedButtons.Contains(button))
-                    {
-                        button.Enabled = false;
-                    }
-                    else
-                    {
-                        button.Enabled = true;
-                    }
 
+                    if (cmdbuttons.Contains(button))
+                    {
+                        button.Enabled = (swap_buttons) ? false : true;
+                    }
+                    else if (toolbuttons.Contains(button))
+                    {
+                        button.Enabled = (swap_buttons) ? true : false;
+                    }
                 }
             }
-
         }
 
 
 
 
 
-
         //update paths from the .txt file
-        void change_compile_paths()
+        void change_paths(byte task)
         {
 
             //replace these lines in paths.txt
             var replacements = new Dictionary<string, string>
                  {
-                     { "COMPILE_LIST", COMPILE_LIST },
-                     { "MOD_DIR", MOD_DIR },
-                     { "MOD_NAME", MOD_NAME },
-                     { "PSX_DIR", PSX_DIR },
-                     { "NAME_ROM", NAME_ROM}
-                 };
+                     { "COMPILE_LIST", mod.COMPILE_LIST },
+                     { "MOD_DIR", mod.MOD_DIR },
+                     { "MOD_NAME", mod.MOD_NAME },
+                     { "PSX_DIR", mod.PSX_DIR },
+                     { "NAME_ROM", mod.NAME_ROM},
+                     {"ISO_PATH", mod.ISO_PATH},
+                     {"ROM_REGION", mod.ROM_REGION},
+                     {"DUCK_PATH", mod.DUCK_PATH }
+
+            };
 
 
-            string[] lines = File.ReadAllLines(PATHS_FILE);
+            string[] lines = File.ReadAllLines(mod.PATHS_FILE);
+
+
 
 
             var updatedLines = new System.Collections.Generic.List<string>();
@@ -266,65 +554,188 @@ namespace Crash_Team_Mod
             {
                 string updatedLine = line;
 
+                if (task == (byte)paths.READ_PATHS) //if loading previous config
+                {
+                    foreach (var path in replacements.Keys.ToList())
+                    {
+                        string format = $@"^{path}\s*=\s*""([^""]+)""";
+                        Match match = Regex.Match(line, format);
+                        if (match.Success)
+                        {
 
-                foreach (var path in replacements)
+                            if (path == "COMPILE_LIST") mod.COMPILE_LIST = match.Groups[1].Value;
+                            if (path == "MOD_DIR") mod.MOD_DIR = match.Groups[1].Value;
+                            if (path == "MOD_NAME") mod.MOD_NAME = match.Groups[1].Value;
+                            if (path == "PSX_DIR") mod.PSX_DIR = match.Groups[1].Value;
+                            if (path == "NAME_ROM") mod.NAME_ROM = match.Groups[1].Value;
+                            if (path == "ISO_PATH") mod.ISO_PATH = match.Groups[1].Value;
+                            if (path == "ROM_REGION") mod.ROM_REGION = match.Groups[1].Value;
+                            if (path == "DUCK_PATH") mod.DUCK_PATH = match.Groups[1].Value;
+
+                        }
+                    }
+
+                }
+                else 
                 {
 
-                    updatedLine = Regex.Replace(updatedLine, $@"^{path.Key}\s*=\s*\"".*?\""", $"{path.Key} = \"{path.Value}\"");
+                    foreach (var path in replacements)
+                    {
+                        if (task == (byte)paths.SAVE_DUCK)
+                        {
+                            if (path.Key == "DUCK_PATH")
+                                updatedLine = Regex.Replace(updatedLine, $@"^DUCK_PATH\s*=\s*\"".*?\""", $"DUCK_PATH = \"{mod.DUCK_PATH}\"");
+                        }
+                        else
+                        {
+                            if (task == (byte)paths.REFRESH_ISO) //if update iso path
+                            {
+
+                                if (path.Key == "ISO_PATH")
+                                    updatedLine = Regex.Replace(updatedLine, $@"^ISO_PATH\s*=\s*\"".*?\""", $"ISO_PATH = \"{mod.ISO_PATH}\"");
+
+
+                                if (path.Key == "NAME_ROM")
+                                    updatedLine = Regex.Replace(updatedLine, $@"^NAME_ROM\s*=\s*\"".*?\""", $"NAME_ROM = \"{mod.NAME_ROM}\"");
+
+                                if (path.Key == "ROM_REGION")
+                                    updatedLine = Regex.Replace(updatedLine, $@"^ROM_REGION\s*=\s*\"".*?\""", $"ROM_REGION = \"{mod.ROM_REGION}\"");
+
+                            }
+                            else //if new buildList
+                            {
+                                updatedLine = Regex.Replace(updatedLine, $@"^{path.Key}\s*=\s*\"".*?\""", $"{path.Key} = \"{path.Value}\"");
+                            }
+                        }
+                    }
+
+                    updatedLines.Add(updatedLine);
+
+
+
+                    File.WriteAllLines(mod.PATHS_FILE, updatedLines.ToArray());
                 }
-
-
-                updatedLines.Add(updatedLine);
             }
 
+            if (task == (byte)paths.SAVE_DUCK) return;
 
-            File.WriteAllLines(PATHS_FILE, updatedLines.ToArray());
-
+            //set the path for ctr tools functions
+            mod.MODDED_ROM = Path.Combine(mod.ISO_PATH, "ctr_rebuild.bin");
+            mod.XDELTA_PATCH = Path.Combine(mod.ISO_PATH, "ctr_rebuild.xdelta");
         }
 
 
 
 
 
-
-
-        //update iso path
-        void update_iso_folder()
+        //hide or show gui buttons
+        void switch_gui(byte swap)
         {
-            string old_folder = "ISO_PATH";
-            string old_name = "NAME_ROM";
-            string new_folder = ISO_PATH;
-            string new_name = NAME_ROM;
 
-            string[] lines = File.ReadAllLines(PATHS_FILE);
+            List<Control> hide = new List<Control> { dis_b, tex_b, log_b, comp_b, cleanc_b, buildc_b, exc_b, xd_b, cleanr_b, psx_r,
+            usa_b, jap_b, pal_b, sep3_b, jtrial_b, ext_toolsb, adv_toolsb, rebuild_toolsb, xdelta_toolsb, console_t, enable_mod, 
+            drag_buildlist, d_label, db_label, m_label, drag_buildlist, openr_b, prev_settingsb};
 
-            var updated = new System.Collections.Generic.List<string>();
 
-            foreach (var line in lines)
+
+            rom.Visible = (swap != (byte)gui.SET_DUCK_PATH) ? true : false;
+            search_rom.Visible = (swap != (byte)gui.SET_DUCK_PATH) ? true : false;
+            r_label.Visible = (swap != (byte)gui.SET_DUCK_PATH) ? true : false;
+
+            foreach (Control control in groupBox1.Controls)
+                {
+
+                if (hide.Contains(control))
+                    {
+                    if (swap > (byte)gui.MAIN)
+                     {
+                        control.Hide();
+                     }
+                     else
+                     {
+                        control.Show();
+                     }
+                }
+          }
+            if (swap == (byte)gui.SET_DUCK_PATH)
+            {
+                adv_goback.Location = new Point(420, 230);
+                duck.Location = new Point(370, 206);
+                search_duckb.Location = new Point(579, 206);
+                duck_label.Location = new Point(370, 182);
+            }
+
+            if (swap == (byte)gui.ADVANCED)
             {
 
-                string update_iso = Regex.Replace(line, $@"^{old_folder}\s*=\s*\"".*?\""", $"{old_folder} = \"{new_folder}\"");
-                update_iso = Regex.Replace(update_iso, $@"^{old_name}\s*=\s*\"".*?\""", $"{old_name} = \"{new_name}\"");
-
-                updated.Add(update_iso);
+                adv_lngconv.Location = new Point(24, 71);
+                adv_lngfolder.Location = new Point(24, 95);
+                adv_lngpath.Location = new Point(24, 47);
+                adv_lngsearch.Location = new Point(143, 47);
+                adv_modelconv.Location = new Point(240, 71);
+                adv_modelfolder.Location = new Point(240, 95);
+                adv_modelpath.Location = new Point(240, 47);
+                adv_modelsearch.Location = new Point(360, 47);
+                adv_openxa.Location = new Point(24, 203);
+                adv_xapath.Location = new Point(24, 179);
+                adv_searchxa.Location = new Point(143, 179);
+                adv_xaudiofolder.Location = new Point(24, 247);
+                adv_trackfolder.Location = new Point(240, 203);
+                adv_tscreenfolder.Location = new Point(240, 227);
+                adv_howlfolder.Location = new Point(423, 141);
+                adv_tools_gui.Location = new Point(423, 175);
+                adb_rebfolder.Location = new Point(415, 220);
+                adv_goback.Location = new Point(16, 400);
+                ot_label.Location = new Point(433, 121);
+                lng_label.Location = new Point(24, 20);
+                md_label.Location = new Point(240, 20);
+                xa_label.Location = new Point(24, 159);
+                 
             }
-
-            File.WriteAllLines(PATHS_FILE, updated.ToArray());
-
-            action = "refresh_iso";
-            commands(action);
-
-
+            else if (swap == (byte)gui.MAIN)
+            {
+                adv_lngconv.Location = new Point(1064, 243);
+                adv_lngfolder.Location = new Point(1064, 243);
+                adv_lngpath.Location = new Point(1064, 243);
+                adv_lngsearch.Location = new Point(1064, 243);
+                adv_modelconv.Location = new Point(1064, 243);
+                adv_modelfolder.Location = new Point(1064, 243);
+                adv_modelpath.Location = new Point(1064, 243);
+                adv_modelsearch.Location = new Point(1064, 243);
+                adv_openxa.Location = new Point(1064, 243);
+                adv_xapath.Location = new Point(1064, 243);
+                adv_searchxa.Location = new Point(1064, 243);
+                adv_xaudiofolder.Location = new Point(1064, 243);
+                adv_trackfolder.Location = new Point(1064, 243);
+                adv_tscreenfolder.Location = new Point(1064, 243);
+                adv_goback.Location = new Point(1064, 243);
+                adv_howlfolder.Location = new Point(1064, 243);
+                adv_tools_gui.Location = new Point(1064, 243);
+                adb_rebfolder.Location = new Point(1064, 243);
+                duck.Location = new Point(1064, 243);
+                search_duckb.Location = new Point(1064, 243);
+                ot_label.Location = new Point(1064, 243);
+                lng_label.Location = new Point(1064, 243);
+                md_label.Location = new Point(1064, 243);
+                xa_label.Location = new Point(1064, 243);
+                duck_label.Location = new Point(1064, 243);
+            }
+            
         }
 
+        bool rebuild_rom = false; //select the current rom for duckstation
 
 
-
-
-        //unused in beta
         private void enable_mod_CheckedChanged(object sender, EventArgs e)
         {
+            psx_execute((byte)psx.CLOSE);
             buttons();
+            rebuild_rom ^= true;
+
+            prev_settingsb.Checked = false;
+            prev_settingsb.Enabled = true;
+
+            print_welcome();
         }
 
 
@@ -338,17 +749,33 @@ namespace Crash_Team_Mod
             if (romfile.ShowDialog() == DialogResult.OK)
             {
                 rom.Text = romfile.FileName;
-                NAME_ROM = System.IO.Path.GetFileName(romfile.FileName);
-                ISO_PATH = System.IO.Directory.GetParent(romfile.FileName).FullName;
 
-                version_bool = true;
+                //if rom name hace spaces
+                if (romfile.FileName.Contains(" "))
+                {
+                    if (!Directory.Exists(mod.BACKUP_FOLDER))
+                    {
+                        System.IO.Directory.CreateDirectory(mod.BACKUP_FOLDER);
+                    }
 
-                update_iso_folder();
+                    MessageBox.Show("your rom path contains spaces, a temp folder will be created");
+                    mod.TEMP_ROM = Path.Combine(mod.BACKUP_FOLDER, "ctr.bin");
+                    FileSystem.CopyFile(romfile.FileName, mod.TEMP_ROM, true);
+                    Process.Start("explorer.exe", mod.BACKUP_FOLDER);
 
+                    mod.ISO_PATH = System.IO.Directory.GetParent(mod.TEMP_ROM).FullName;
+                    mod.NAME_ROM = System.IO.Path.GetFileName(mod.TEMP_ROM);
+                }
+                else
+                {
+                    mod.NAME_ROM = System.IO.Path.GetFileName(romfile.FileName);
+                    mod.ISO_PATH = System.IO.Directory.GetParent(romfile.FileName).FullName;
+                }
+
+
+                change_paths((byte)paths.REFRESH_ISO);
             }
         }
-
-
 
 
 
@@ -356,40 +783,34 @@ namespace Crash_Team_Mod
         //set buildlist path
         private void drop_buildlist(object sender, DragEventArgs e)
         {
-            //first close previous buildlists just in case
-            close_cmd();
-
-
 
             // get the path of buildList.txt
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-            COMPILE_LIST = files[0];
+            mod.COMPILE_LIST = files[0];
 
-            string PREV_MODDIR = System.IO.Directory.GetParent(COMPILE_LIST).FullName;
-            MOD_NAME = System.IO.Path.GetFileName(PREV_MODDIR);
+            psx_execute((byte)psx.TEMP_PATH); // check if paths contains spaces
+
+            mod.BACKUP_MODDIR = GET_MODDIR;
+            string PREV_MODDIR = Path.Combine(mod.TEMP_SDK, GET_MODDIR.Substring(mod.PREV_SDK.Length).TrimStart(Path.DirectorySeparatorChar));
+            string PREV_COMPILE_LIST = Path.Combine(PREV_MODDIR, "buildList.txt");
+            mod.MOD_NAME = System.IO.Path.GetFileName(PREV_MODDIR);
             PREV_MODDIR += "\\";
-            MOD_DIR = PREV_MODDIR.Replace("\\", "/");
+            mod.MOD_DIR =  PREV_MODDIR.Replace("\\", "/");
 
 
 
             //show current buildlist path
-            MessageBox.Show($"buildList selected: {COMPILE_LIST}");
+            MessageBox.Show($"buildList selected: {mod.COMPILE_LIST}");
+            mod.COMPILE_LIST = PREV_COMPILE_LIST; //dont show this in the messagebox bc it can be a temp folder
+
 
             //update txt paths
-            change_compile_paths();
+            change_paths((byte)paths.WRITE_PATHS);
 
             //open buildlist
-            open_cmd();
+            psx_execute((byte)psx.OPEN);
 
             active_buildlist = true;
-
-            if (!string.IsNullOrEmpty(game_ver))
-            {
-                action = game_ver;
-                version_bool = true;
-                commands(action);
-                console_t.Text = string.Empty;
-            }
         }
 
 
@@ -416,18 +837,17 @@ namespace Crash_Team_Mod
         }
 
 
-
-
+        //decides the rom region
+        void set_rom_region(byte reg)
+        {
+            commands(reg);
+            change_paths((byte)paths.REFRESH_ISO);
+        }
 
         //set usa rom as default
         private void select_usa(object sender, EventArgs e)
         {
-            action = "sel_usa true";
-            game_ver = action;
-            version_bool = true;
-            task_text = "NTSC-U ROM WAS SELECTED";
-            console_t.AppendText(task_text + Environment.NewLine);
-            commands(action);
+            set_rom_region((byte)region.CTR_USA);
         }
 
 
@@ -435,12 +855,7 @@ namespace Crash_Team_Mod
         //set japanese rom as default
         private void select_japan(object sender, EventArgs e)
         {
-            action = "use_jap true";
-            game_ver = action;
-            version_bool = true;
-            task_text = "NTSC-J ROM WAS SELECTED";
-            console_t.AppendText(task_text + Environment.NewLine);
-            commands(action);
+            set_rom_region((byte)region.CTR_JAPAN);
         }
 
 
@@ -449,25 +864,27 @@ namespace Crash_Team_Mod
         //set pal rom as default
         private void select_pal(object sender, EventArgs e)
         {
-            action = "use_pal true";
-            game_ver = action;
-            version_bool = true;
-            task_text = "PAL ROM WAS SELECTED";
-            console_t.AppendText(task_text + Environment.NewLine);
-            commands(action);
+            set_rom_region((byte)region.CTR_PAL);
         }
 
+        //set prototype september 3 rom as default
+        private void select_protosep3(object sender, EventArgs e)
+        {
+            set_rom_region((byte)region.CTR_PROTO);
 
+        }
+
+        //set japanese trial rom as default
+       private void select_jtrial(object sender, EventArgs e)
+        {
+            set_rom_region((byte)region.CTR_J_TRIAL);
+        }
 
 
         //compilation
         private void compile(object sender, EventArgs e)
         {
-            action = "start_compile";
-            console_t.Text = string.Empty;
-            task_text = "STARTING COMPILATION PLS WAIT...";
-            console_t.AppendText(task_text + Environment.NewLine);
-            commands(action);
+            psx_execute((byte)psx.COMPILE);
         }
 
 
@@ -476,11 +893,7 @@ namespace Crash_Team_Mod
         //clean compiled files
         private void clean_compilation(object sender, EventArgs e)
         {
-            action = "clean_comp";
-            commands(action);
-            console_t.Text = string.Empty;
-            task_text = "CLEANING COMPILED FILES...";
-            console_t.AppendText(task_text + Environment.NewLine);
+            psx_execute((byte)psx.CLEAN_C);
         }
 
 
@@ -489,9 +902,7 @@ namespace Crash_Team_Mod
         //build rom
         private void build_rom(object sender, EventArgs e)
         {
-            action = "mod_build";
-            console_t.Text = string.Empty;
-            commands(action);
+            psx_execute((byte)psx.BUILD_ROM);
         }
 
 
@@ -500,9 +911,7 @@ namespace Crash_Team_Mod
         //extract vanilla rom
         private void extract_rom(object sender, EventArgs e)
         {
-            action = "mod_extract";
-            console_t.Text = string.Empty;
-            commands(action);
+            psx_execute((byte)psx.EXTRACT);
         }
 
 
@@ -512,8 +921,7 @@ namespace Crash_Team_Mod
         //create xdelta
         private void generate_xdelta(object sender, EventArgs e)
         {
-            action = "mod_xdelta";
-            commands(action);
+            psx_execute((byte)psx.XDELTA);
         }
 
 
@@ -522,11 +930,7 @@ namespace Crash_Team_Mod
         //clean rom files
         private void clean_rom(object sender, EventArgs e)
         {
-            action = "clean_iso";
-            commands(action);
-            console_t.Text = string.Empty;
-            task_text = "CLEANING ROM FILES...";
-            console_t.AppendText(task_text + Environment.NewLine);
+            psx_execute((byte)psx.CLEAN_R);
         }
 
 
@@ -535,10 +939,7 @@ namespace Crash_Team_Mod
         //create dissasembly.elf
         private void generate_disasm(object sender, EventArgs e)
         {
-            action = "make_disasm";
-            task_text = "GENERATING DISSASEMBLY.ELF, LOOK IN DEBUG FOLDER.";
-            console_t.AppendText(task_text + Environment.NewLine);
-            commands(action);
+            psx_execute((byte)psx.DISASSEMBLY);
         }
 
 
@@ -547,8 +948,7 @@ namespace Crash_Team_Mod
         //export textures as c files (idk what is this)
         private void ex_textures(object sender, EventArgs e)
         {
-            action = "export_texturesc";
-            commands(action);
+            psx_execute((byte)psx.TEXTURES);
         }
 
 
@@ -558,31 +958,478 @@ namespace Crash_Team_Mod
         //open debug folder
         private void open_logs(object sender, EventArgs e)
         {
-            string prev_debug = MOD_DIR.Replace("/", "\\");
-            debug_path = Path.Combine(prev_debug, "debug");
+            string error = "cant open debug folder, make sure you compiled a mod before";
 
-            if (Directory.Exists(debug_path))
+            if (mod.MOD_DIR == null)
             {
-                Process.Start("explorer.exe", debug_path);
+                MessageBox.Show(error);
+                return;
+            }
+
+            mod.DEBUG_PATH = Path.Combine(mod.MOD_DIR.Replace("/", "\\"), "debug");
+
+            if (Directory.Exists(mod.DEBUG_PATH))
+            {
+                Process.Start("explorer.exe", mod.DEBUG_PATH);
             }
             else
             {
-                MessageBox.Show("cant open debug folder, make sure you tried to compile a mod before");
+                MessageBox.Show(error);
             }
         }
 
+
+
+
+
+        //restart cmd
         private void psx_restart(object sender, EventArgs e)
         {
-            if (active_buildlist)
+            if (!active_buildlist) MessageBox.Show("No buildlist loaded");
+
+            psx_execute((byte)psx.RELOAD);
+        }
+    
+
+
+        //if loading previous presets
+        private void load_presets(object sender, EventArgs e)
+        {
+            byte i;
+
+            //load paths from the txt
+            change_paths((byte)paths.READ_PATHS);
+
+            string[] presets = {mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
+
+
+            for (i = 0; i < 2; i++)
             {
-                restart_cmd();
-                console_t.Text = string.Empty;
-                open_cmd();
+
+                if (!File.Exists(presets[i]))
+                {
+                    if (i == 0) MessageBox.Show("cant find:" + presets[i]);
+
+                    if (i == 1) MessageBox.Show("the rom file:" + presets[i] + "doesnt exist");
+
+                    return;
+                }
             }
-            else
+
+            rom.Text = Path.Combine(mod.ISO_PATH, mod.NAME_ROM);
+
+            //check if the folder have spaces
+            psx_execute((byte)psx.TEMP_PATH);
+
+            //open the buildList
+            psx_execute((byte)psx.OPEN); 
+            active_buildlist = true;
+
+            prev_settingsb.Enabled = false;
+        }
+
+
+
+        //open duckstation
+        private void open_duck(object sender, EventArgs e)
+        {
+            psx_execute((byte)psx.DUCK);
+        }
+
+
+        
+        private void duck_Search(object sender, EventArgs e)
+        {
+            if (duckexe.ShowDialog() == DialogResult.OK)
             {
-                MessageBox.Show("No buildlist loaded");
+                //update textbox and duckpath string
+                duck.Text = duckexe.FileName;
+                mod.DUCK_PATH = duckexe.FileName;
+                change_paths((byte)paths.SAVE_DUCK);
+
+                psx_execute((byte)psx.DUCK); //open duck
             }
         }
+
+        //to open a program
+        void execute_process(byte mode, string file, string args, string workdir) //TO DO: ADD ARG FOR CREATENOWINDOW
+        {
+
+            //0 = all false no wait exit
+            // 1 = redirect false shell true & wait exit
+            // 2 = redirect true shell false no wait exit
+            // 3 = redirect true shell true & wait exit
+            // 4 = redirect true shell true no wait exit
+            // 5 = redirect true shell false wait exit
+            // 6 = redirect false shell false wait exit
+
+            ProcessStartInfo exec_process = new ProcessStartInfo
+            {
+                FileName = file,
+                Arguments = args,
+                WorkingDirectory = workdir,
+                RedirectStandardOutput = (mode < 2 || mode == 6) ? false : true,
+                RedirectStandardError = (mode < 2 || mode == 6) ? false : true,
+                UseShellExecute = (mode == 1 || mode > 2 && mode < 5 ) ? true : false,
+                CreateNoWindow = true
+            };
+            using (Process process = new Process {StartInfo = exec_process})
+            {
+                process.Start();
+
+                if ((mode == 1 || mode == 3 && mode > 4)) process.WaitForExit();
+
+                if (mode >= 2 && mode <= 5)
+                {
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+                    if (String.IsNullOrEmpty(error)) MessageBox.Show("ERROR:" + error);
+
+                }
+
+            }
+        }
+
+
+
+
+        //ctr tools functions
+        void ctr_tools_funcs(byte func)
+        {
+            string filename;
+            string args;
+
+            switch (func)
+            {
+
+
+                case ((byte)modding_tools.EXTRACT):
+                    {
+
+                        if (!File.Exists(rom.Text) || rom.Text == null)
+                        {
+                            MessageBox.Show("Error! Cant find the rom.");
+                            return;
+                        }
+
+                        mod.REBUILD_FOLDER = Path.Combine(mod.ISO_PATH, "ctr_rebuild");
+
+                        string ext_rom = Path.Combine(mod.ISO_PATH, mod.NAME_ROM); //rom name
+
+                        //dumpiso args
+                        filename = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "mkpsxiso"), "dumpsxiso.exe"));
+                        args = $"\"{ext_rom}\" -x \"{mod.REBUILD_FOLDER}\" -s \"{mod.REBUILD_FOLDER}.xml\"";
+                        execute_process(6, filename, args, mod.PREV_PSX_DIR); //dumpiso
+
+                        //bigtool args
+                        filename = mod.BIGTOOL;
+                        args = $"\"{Path.Combine(mod.REBUILD_FOLDER, "bigfile.big")}\"";
+                        execute_process(6, filename, args, mod.PREV_PSX_DIR); //bigtool
+
+                        MessageBox.Show("Rom succesfully extracted in:", mod.REBUILD_FOLDER);
+                        break;
+                    }
+
+
+
+                case ((byte)modding_tools.REBUILD):
+                    {
+                        string mkpsxiso = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "mkpsxiso"), "mkpsxiso.exe"));
+
+
+                        if (!Directory.Exists(mod.REBUILD_FOLDER) || mod.REBUILD_FOLDER == null)
+                        {
+                            MessageBox.Show("Error! ctr_rebuild folder not exist.");
+                            return;
+                        }
+
+                        //big tools args
+                        filename = mod.BIGTOOL;
+                        args = $"\"{Path.Combine(mod.REBUILD_FOLDER, "bigfile.txt")}\"";
+                        execute_process(6, filename, args, mod.REBUILD_FOLDER); //build bigtools
+
+
+                        //mkpsxiso args
+                        filename = mkpsxiso;
+                        args = $"\"{Path.Combine(mod.ISO_PATH, "ctr_rebuild.xml")}\" -y -q -o \"{mod.MODDED_ROM}\"";
+                        execute_process(6, filename, args, mod.PREV_PSX_DIR); //mkpsxiso
+
+                        MessageBox.Show("Rom rebuilded!");
+                        break;
+                    }
+
+
+
+                case ((byte)modding_tools.XDELTA):
+                    {
+                        string xdelta3 = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "xdelta3.exe"));
+
+                        if (!File.Exists(mod.MODDED_ROM) || mod.MODDED_ROM == null)
+                        {
+                            MessageBox.Show("cant find ctr_rebuild.bin");
+                            return;
+                        }
+
+                        //xdelta args
+                        filename = xdelta3;
+                        args = $"-e -s \"{rom.Text}\" \"{mod.MODDED_ROM}\" \"{mod.XDELTA_PATCH}\"";
+                        execute_process(6, filename, args, mod.PREV_PSX_DIR); //make xdelta
+
+                        MessageBox.Show("xdelta created!");
+                        break;
+                    }
+
+
+
+
+                case ((byte)modding_tools.LNG_CONVERT):
+                    {
+                        if (mod.LNG_PATH == null || !File.Exists(mod.LNG_PATH))
+                        {
+                            MessageBox.Show("no LNG selected");
+                            return;
+                        }
+
+                        string lng2text = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "lng2txt.exe"));
+
+                        //lng2txt args
+                        filename = lng2text;
+                        args = $" \"{mod.LNG_PATH}\"";
+                        execute_process(6, filename, args, mod.LNG_PATH); //convert .lng to .txt & .txt to .lng
+
+                        MessageBox.Show("LNG succesfully converted");
+
+                        break;
+                    }
+
+
+                case ((byte)modding_tools.MODEL_CONVERT):
+                    {
+                        if (mod.MODEL_PATH == null || !File.Exists(mod.MODEL_PATH))
+                        {
+                            MessageBox.Show("no model selected");
+                            return;
+                        }
+
+                        string model_reader = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "model_reader.exe"));
+
+                        //model_reader args
+                        filename = model_reader;
+                        args = $"\"{mod.MODEL_PATH}\"";
+                        execute_process(6, filename, args, mod.MODEL_PATH); //convert .ply to .ctr & .ctr to .obj
+
+                        MessageBox.Show("model succesfully converted");
+
+                        break;
+                    }
+
+
+                case ((byte)modding_tools.XA_OPEN):
+                    {
+                        if(mod.XA_PATH == null || !File.Exists(mod.XA_PATH))
+                        {
+                            MessageBox.Show("cant find" + mod.XA_PATH);
+                            return;
+                        }
+                        string xa = Path.GetFullPath(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "xa_converter"), "XAConv.exe"));
+
+                        //open xa converter
+                        filename = xa;
+                        args = $"\"{mod.XA_PATH}\"";
+                        execute_process(6, filename, args, mod.PREV_PSX_DIR);
+
+                        break;
+                    }
+
+
+
+                case ((byte)modding_tools.OPEN_FOLDER):
+                    {
+                        Process.Start("explorer.exe", mod.TOOLS_OPEN_THIS_FOLDER); //open desired ctr folder
+                        break;
+                    }
+            }
+
+        }
+
+        //ctr tools things
+        private void tools_extract(object sender, EventArgs e)
+        {
+            ctr_tools_funcs((byte)modding_tools.EXTRACT);
+        }
+
+
+        private void tools_build(object sender, EventArgs e)
+        {
+            ctr_tools_funcs((byte)modding_tools.REBUILD);
+        }
+
+        private void tools_xdelta(object sender, EventArgs e) //TO DO: IMPLEMENT XDELTA CREATOR WITH ANY ROM SELECTED
+        {
+            ctr_tools_funcs((byte)modding_tools.XDELTA);
+        }
+
+        private void tools_advanced(object sender, EventArgs e)
+        {
+            switch_gui((byte)gui.ADVANCED);
+        }
+        private void tools_goback(object sender, EventArgs e)
+        {
+            switch_gui((byte)gui.MAIN);
+        }
+
+        private void tools_lngSearch(object sender, EventArgs e)
+        {
+            if (lngfile.ShowDialog() == DialogResult.OK)
+            {
+                adv_lngpath.Text = lngfile.FileName;
+                mod.LNG_PATH = lngfile.FileName;
+            }
+        }
+
+        private void tools_modelSearch(object sender, EventArgs e)
+        {
+            if (modelfile.ShowDialog() == DialogResult.OK)
+            {
+                adv_modelpath.Text = modelfile.FileName;
+                mod.MODEL_PATH = modelfile.FileName;
+            }
+        }
+
+        private void tools_xaSearch(object sender, EventArgs e)
+        {
+            if (xafile.ShowDialog() == DialogResult.OK)
+            {
+                adv_xapath.Text = xafile.FileName;
+                mod.XA_PATH = xafile.FileName;
+            }
+        }
+
+        //convert ctr files
+        private void tools_convertlng(object sender, EventArgs e)
+        {
+            ctr_tools_funcs((byte)modding_tools.LNG_CONVERT);
+        }
+
+        private void tools_convertmodel(object sender, EventArgs e)
+        {
+            ctr_tools_funcs((byte)modding_tools.MODEL_CONVERT);
+        }
+
+        private void tools_openXAconvert(object sender, EventArgs e)
+        {
+            ctr_tools_funcs((byte)modding_tools.XA_OPEN);
+        }
+
+
+        //open ctr folders
+        private void tools_lngFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(Path.Combine(mod.REBUILD_FOLDER, "bigfile"), "lang"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_modelFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(Path.Combine(Path.Combine(Path.Combine(mod.REBUILD_FOLDER, "bigfile"),
+                "models"), "racers"), "hi"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_xaFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(mod.REBUILD_FOLDER, "XA"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_tittleFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(Path.Combine(mod.REBUILD_FOLDER, "bigfile"), "screen"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_trackFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(Path.Combine(Path.Combine(mod.REBUILD_FOLDER, "bigfile"), "levels"), "tracks"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_howlFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER =
+                Path.GetFullPath(Path.Combine(mod.REBUILD_FOLDER, "SOUNDS"));
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        private void tools_ctrFolder(object sender, EventArgs e)
+        {
+            if (!Directory.Exists(mod.REBUILD_FOLDER))
+            {
+                MessageBox.Show("cant find:" + mod.REBUILD_FOLDER);
+                return;
+            }
+
+            mod.TOOLS_OPEN_THIS_FOLDER = mod.REBUILD_FOLDER;
+
+            ctr_tools_funcs((byte)modding_tools.OPEN_FOLDER);
+        }
+
+        //open ctr tools gui
+        private void tools_openTOOLSgui(object sender, EventArgs e)
+        {
+            string program = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "r15"), "CTR-tools-gui.exe"));
+
+            Process.Start(program);
+        }
+
+
     }
 }
+
