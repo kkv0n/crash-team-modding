@@ -8,8 +8,6 @@ The only requirement is to have **.NET Framework 3.5** installed, as the app is 
 
 ## ⚠️ Warning:
 
-- Ensure that folder and ROM names do **not** contain spaces. For example:  
-  `C:\Crash team Racing\c tr.bin` should be `C:\Crash-Team-Racing\c-tr.bin`.
 
 - This app is likely **only compatible with Crash Team Racing (CTR)**. Compatibility with other games is not guaranteed.
 
@@ -41,9 +39,21 @@ The only requirement is to have **.NET Framework 3.5** installed, as the app is 
 4. Find the `buildList.txt` file inside the `ctr-mod-sdk` folder and drag it into the gray rectangle labeled **"DRAG BUILDLIST"**.
 
 5. Now you can:
-   - Compile
+   - Compile.
    - Build the ROM
-   - Create Xdelta patches  
+   - Create Xdelta patches
+   - Convert .ply models to .ctr
+   - Convert .ctr models to .obj
+
+   - Open & Play Characters
+       Voicelines AUDIOS
+
+   - Convert .lng to .txt
+        or .txt to lng
+
+   - Test your MODDED ROM in
+    duckstation with 1 CLICK!
+
      ...and more!
 
 ---
@@ -53,4 +63,4 @@ That's it! Enjoy the modding experience. 🚀
 ---
 
 ## 🛠️ Upcoming Features:
-- Compatibility with **CTR-TOOLS** (coming soon!)
+- Compatibility with **VRAM EXTRACTOR & HOWL** (coming soon!)
