@@ -49,18 +49,18 @@ namespace Crash_Team_Mod
             xafile.FilterIndex = 1;
 
             //fill the strings
-            mod.PREV_PSX_DIR = System.IO.Directory.GetCurrentDirectory();
             mod.PATHS_FILE = @".\paths.txt";
             mod.BACKUP_FOLDER = @"C:\ctr-mod-files";
-            mod.TEMP_SDK = Path.Combine(mod.BACKUP_FOLDER, "CTR-MOD-SDK");
+            mod.PREV_PSX_DIR = (Directory.Exists(Path.Combine(mod.BACKUP_FOLDER, "data"))) ? 
+                mod.BACKUP_FOLDER : System.IO.Directory.GetCurrentDirectory();
             mod.PSX_DIR = mod.PREV_PSX_DIR.Replace("\\", "/");
-            mod.PSX_TOOLS_PATH = Path.Combine(Path.Combine(mod.PREV_PSX_DIR, "data"), "tools");
-            mod.CTR_TOOLS_PATH = Path.Combine(mod.PSX_TOOLS_PATH, "ctr-tools");
-            mod.BIGTOOL = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "bigtool.exe"));
+            mod.TEMP_SDK = Path.Combine(mod.BACKUP_FOLDER, "CTR-MOD-SDK");
+            mod.ROM_REGION = "1"; // ntsc-u as default value just in case
+            this.Load += move_folder;
 
             //execute this in real time
             System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
-            timer.Interval = 1500;
+            timer.Interval = 3000;
             timer.Tick += (sender, e) => check_process(); //always check if the buildlist are open
             timer.Start();
 
@@ -72,7 +72,7 @@ namespace Crash_Team_Mod
         bool temp_sdk = false;
 
 
-        void print_welcome()
+        void print_welcome() //print welcome message
         {
             console_t.AppendText(@"
 
@@ -113,6 +113,33 @@ namespace Crash_Team_Mod
 " + Environment.NewLine);
 
         }
+
+
+
+        //move toolchain folder if the current folder have spaces
+        void move_folder(object sender, EventArgs e)
+        {
+            if (mod.PSX_DIR.Contains(" ")) //if the folder contains spaces then use a temp folder
+            {
+                MessageBox.Show("Moving work folder pls wait...");
+
+                string backup = Path.Combine(mod.PREV_PSX_DIR, "data");
+
+
+                mod.PREV_PSX_DIR = mod.BACKUP_FOLDER;
+
+                mod.PSX_DIR = mod.PREV_PSX_DIR.Replace("\\", "/");
+
+                FileSystem.MoveDirectory(backup, Path.Combine(mod.PREV_PSX_DIR, "data"), true);
+
+                change_paths((byte)paths.WRITE_PATHS); //update .txt with the new path
+            }
+            mod.PSX_TOOLS_PATH = Path.Combine(Path.Combine(mod.PREV_PSX_DIR, "data"), "tools");
+            mod.CTR_TOOLS_PATH = Path.Combine(mod.PSX_TOOLS_PATH, "ctr-tools");
+            mod.BIGTOOL = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "bigtool.exe"));
+        }
+
+
 
 
         //check if the cmd is open
@@ -171,7 +198,7 @@ namespace Crash_Team_Mod
             string builder = Path.GetFullPath(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "mod-builder"), "main.py"));
 
             //the gui can get frozen without this for some reason
-            int selectionStart =console_t.SelectionStart;
+            int selectionStart = console_t.SelectionStart;
             bool autoScroll = console_t.SelectionStart == console_t.Text.Length;
 
             mod.psx_cmd = new Process
@@ -333,9 +360,9 @@ namespace Crash_Team_Mod
 
                 case (byte)psx.OPEN:
                     {
-                        if (rom.Text == null)
+                        if(!Directory.Exists(mod.PREV_PSX_DIR))
                         {
-                            MessageBox.Show("pls select a rom first");
+                            MessageBox.Show("error: cant find data folder, data folder is lost, pls download the app again");
                             return;
                         }
 
@@ -546,7 +573,6 @@ namespace Crash_Team_Mod
 
 
 
-
             var updatedLines = new System.Collections.Generic.List<string>();
 
 
@@ -588,6 +614,8 @@ namespace Crash_Team_Mod
                         }
                         else
                         {
+                            if (rom.Text == String.Empty) return;
+
                             if (task == (byte)paths.REFRESH_ISO) //if update iso path
                             {
 
@@ -604,6 +632,7 @@ namespace Crash_Team_Mod
                             }
                             else //if new buildList
                             {
+
                                 updatedLine = Regex.Replace(updatedLine, $@"^{path.Key}\s*=\s*\"".*?\""", $"{path.Key} = \"{path.Value}\"");
                             }
                         }
@@ -759,9 +788,9 @@ namespace Crash_Team_Mod
                     }
 
                     MessageBox.Show("your rom path contains spaces, a temp folder will be created");
-                    mod.TEMP_ROM = Path.Combine(mod.BACKUP_FOLDER, "ctr.bin");
+                    mod.TEMP_ROM = Path.Combine(Path.Combine(mod.BACKUP_FOLDER, "rom"), "ctr.bin");
                     FileSystem.CopyFile(romfile.FileName, mod.TEMP_ROM, true);
-                    Process.Start("explorer.exe", mod.BACKUP_FOLDER);
+                    Process.Start("explorer.exe", System.IO.Directory.GetParent(mod.TEMP_ROM).FullName);
 
                     mod.ISO_PATH = System.IO.Directory.GetParent(mod.TEMP_ROM).FullName;
                     mod.NAME_ROM = System.IO.Path.GetFileName(mod.TEMP_ROM);
@@ -784,6 +813,12 @@ namespace Crash_Team_Mod
         private void drop_buildlist(object sender, DragEventArgs e)
         {
 
+            if (rom.Text == String.Empty)
+            {
+                MessageBox.Show("pls select a rom first");
+                return;
+            }
+
             // get the path of buildList.txt
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
             mod.COMPILE_LIST = files[0];
@@ -791,13 +826,14 @@ namespace Crash_Team_Mod
             psx_execute((byte)psx.TEMP_PATH); // check if paths contains spaces
 
             mod.BACKUP_MODDIR = GET_MODDIR;
-            string PREV_MODDIR = Path.Combine(mod.TEMP_SDK, GET_MODDIR.Substring(mod.PREV_SDK.Length).TrimStart(Path.DirectorySeparatorChar));
+            string PREV_MODDIR = (temp_sdk) ? Path.Combine(mod.TEMP_SDK, GET_MODDIR.Substring(mod.PREV_SDK.Length).TrimStart(Path.DirectorySeparatorChar))
+                : mod.BACKUP_MODDIR;
             string PREV_COMPILE_LIST = Path.Combine(PREV_MODDIR, "buildList.txt");
             mod.MOD_NAME = System.IO.Path.GetFileName(PREV_MODDIR);
             PREV_MODDIR += "\\";
             mod.MOD_DIR =  PREV_MODDIR.Replace("\\", "/");
 
-
+            MessageBox.Show(mod.BACKUP_MODDIR);
 
             //show current buildlist path
             MessageBox.Show($"buildList selected: {mod.COMPILE_LIST}");
@@ -1000,7 +1036,13 @@ namespace Crash_Team_Mod
             //load paths from the txt
             change_paths((byte)paths.READ_PATHS);
 
-            string[] presets = {mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
+            if (!File.Exists(mod.COMPILE_LIST))
+            {
+                MessageBox.Show("invalid path, pls load a new buildlist");
+                return;
+            }
+
+                string[] presets = {mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
 
 
             for (i = 0; i < 2; i++)
@@ -1106,7 +1148,7 @@ namespace Crash_Team_Mod
                 case ((byte)modding_tools.EXTRACT):
                     {
 
-                        if (!File.Exists(rom.Text) || rom.Text == null)
+                        if (!File.Exists(rom.Text) || rom.Text == String.Empty)
                         {
                             MessageBox.Show("Error! Cant find the rom.");
                             return;
