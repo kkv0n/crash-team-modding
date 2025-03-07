@@ -239,7 +239,9 @@ namespace Crash_Team_Mod
             {
                 if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
                 {
+                    console_t.SuspendLayout();
                     console_t.Invoke((Action)(() => console_t.AppendText(e.Data + Environment.NewLine)));
+                    console_t.ResumeLayout();
 
                     if (autoScroll) //avoid gui crashes
                     {
@@ -256,7 +258,11 @@ namespace Crash_Team_Mod
             mod.psx_cmd.ErrorDataReceived += (sender, e) =>
             {
                 if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
+                {
+                    console_t.SuspendLayout();
                     console_t.Invoke((Action)(() => console_t.AppendText($"[cmd] {e.Data}" + Environment.NewLine)));
+                    console_t.ResumeLayout();
+                }
             };
 
             mod.psx_cmd.Start();
@@ -340,11 +346,15 @@ namespace Crash_Team_Mod
                         {
                             if (console_t.InvokeRequired)
                             {
+                                console_t.SuspendLayout();
                                 console_t.Invoke((MethodInvoker)(() => console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine)));
+                                console_t.ResumeLayout();
                             }
                             else
                             {
+                                console_t.SuspendLayout();
                                 console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine);
+                                console_t.ResumeLayout();
                             }
                         }
 
@@ -552,11 +562,15 @@ namespace Crash_Team_Mod
             {
                 if (console_t.InvokeRequired)
                 {
+                    console_t.SuspendLayout();
                     console_t.Invoke((MethodInvoker)(() => console_t.AppendText(TASK_TEXT[command] + Environment.NewLine)));
+                    console_t.ResumeLayout();
                 }
                 else
                 {
+                    console_t.SuspendLayout();
                     console_t.AppendText(TASK_TEXT[command] + Environment.NewLine);
+                    console_t.ResumeLayout();
                 }
 
 
