@@ -15,6 +15,7 @@ namespace Crash_Team_Mod_Header
         public StreamWriter psx_input;
 
         //important strings
+        //TO DO: REDUCE THE NUMBER OF STRINGS
         public string PATHS_FILE;
         public string BACKUP_FOLDER;       //if your og folder have spaces
         public string PREV_SDK;
@@ -42,6 +43,7 @@ namespace Crash_Team_Mod_Header
         public string XA_PATH;
         public string TOOLS_OPEN_THIS_FOLDER;
         public string DESIRED_ROM;
+        public string ROM_TO_EXTRACT;
 
         //enum gui tasks
         public enum psx : byte

@@ -789,6 +789,7 @@ namespace Crash_Team_Mod
                 lng_label.Location = new Point(24, 20);
                 md_label.Location = new Point(240, 20);
                 xa_label.Location = new Point(24, 159);
+                r_label.Text = "ORIGINAL BASE ROM";
 
             }
             else if (swap == (byte)gui.MAIN)
@@ -818,6 +819,7 @@ namespace Crash_Team_Mod
                 md_label.Location = new Point(1064, 243);
                 xa_label.Location = new Point(1064, 243);
                 duck_label.Location = new Point(1064, 243);
+                r_label.Text = "SELECT YOUR ROM";
             }
 
         }
@@ -842,7 +844,7 @@ namespace Crash_Team_Mod
 
 
         //set rom path
-        private void search_rom_Click(object sender, EventArgs e)
+        private void search_rom_Click(object sender, EventArgs e) //TO DO: MERGE NAME_ROM WITH ISO_PATH AND ONLY SEPARATE IT IN CMD
         {
             if (romfile.ShowDialog() == DialogResult.OK)
             {
@@ -1246,7 +1248,7 @@ namespace Crash_Team_Mod
 
                         mod.REBUILD_FOLDER = Path.Combine(mod.ISO_PATH, "ctr_rebuild");
 
-                        string ext_rom = Path.Combine(mod.ISO_PATH, mod.NAME_ROM); //rom name
+                        string ext_rom = Path.GetFullPath(mod.ROM_TO_EXTRACT); //rom name
 
                         //dumpiso args
                         filename = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "mkpsxiso"), "dumpsxiso.exe"));
@@ -1387,7 +1389,11 @@ namespace Crash_Team_Mod
         //ctr tools things
         private void tools_extract(object sender, EventArgs e)
         {
-            ctr_tools_funcs((byte)modding_tools.EXTRACT);
+            if (romfile.ShowDialog() == DialogResult.OK)
+            {
+                mod.ROM_TO_EXTRACT = romfile.FileName;
+                ctr_tools_funcs((byte)modding_tools.EXTRACT);
+            }
         }
 
 
@@ -1401,7 +1407,7 @@ namespace Crash_Team_Mod
             ctr_tools_funcs((byte)modding_tools.XDELTA);
         }
 
-        private void tools_advanced(object sender, EventArgs e)
+        private void tools_advanced(object sender, EventArgs e) 
         {
             switch_gui((byte)gui.ADVANCED);
         }

@@ -30,6 +30,13 @@
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(CTM));
             this.groupBox1 = new System.Windows.Forms.GroupBox();
+            this.duck_label = new System.Windows.Forms.Label();
+            this.ot_label = new System.Windows.Forms.Label();
+            this.xa_label = new System.Windows.Forms.Label();
+            this.lng_label = new System.Windows.Forms.Label();
+            this.md_label = new System.Windows.Forms.Label();
+            this.adv_searchxa = new System.Windows.Forms.Button();
+            this.adv_xapath = new System.Windows.Forms.TextBox();
             this.search_duckb = new System.Windows.Forms.Button();
             this.duck = new System.Windows.Forms.TextBox();
             this.adv_goback = new System.Windows.Forms.Button();
@@ -82,13 +89,6 @@
             this.label1 = new System.Windows.Forms.Label();
             this.romfile = new System.Windows.Forms.OpenFileDialog();
             this.duckexe = new System.Windows.Forms.OpenFileDialog();
-            this.adv_xapath = new System.Windows.Forms.TextBox();
-            this.adv_searchxa = new System.Windows.Forms.Button();
-            this.md_label = new System.Windows.Forms.Label();
-            this.lng_label = new System.Windows.Forms.Label();
-            this.xa_label = new System.Windows.Forms.Label();
-            this.ot_label = new System.Windows.Forms.Label();
-            this.duck_label = new System.Windows.Forms.Label();
             this.modelfile = new System.Windows.Forms.OpenFileDialog();
             this.xafile = new System.Windows.Forms.OpenFileDialog();
             this.lngfile = new System.Windows.Forms.OpenFileDialog();
@@ -159,6 +159,85 @@
             this.groupBox1.Size = new System.Drawing.Size(1017, 462);
             this.groupBox1.TabIndex = 0;
             this.groupBox1.TabStop = false;
+            // 
+            // duck_label
+            // 
+            this.duck_label.AutoSize = true;
+            this.duck_label.BackColor = System.Drawing.Color.Transparent;
+            this.duck_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.duck_label.ForeColor = System.Drawing.Color.Black;
+            this.duck_label.Location = new System.Drawing.Point(1086, 240);
+            this.duck_label.Name = "duck_label";
+            this.duck_label.Size = new System.Drawing.Size(215, 24);
+            this.duck_label.TabIndex = 56;
+            this.duck_label.Text = "DUCKSTATION PATH";
+            // 
+            // ot_label
+            // 
+            this.ot_label.AutoSize = true;
+            this.ot_label.BackColor = System.Drawing.Color.Transparent;
+            this.ot_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.ot_label.ForeColor = System.Drawing.Color.Black;
+            this.ot_label.Location = new System.Drawing.Point(1115, 190);
+            this.ot_label.Name = "ot_label";
+            this.ot_label.Size = new System.Drawing.Size(82, 20);
+            this.ot_label.TabIndex = 55;
+            this.ot_label.Text = "OTHERS";
+            // 
+            // xa_label
+            // 
+            this.xa_label.AutoSize = true;
+            this.xa_label.BackColor = System.Drawing.Color.Transparent;
+            this.xa_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.xa_label.ForeColor = System.Drawing.Color.Black;
+            this.xa_label.Location = new System.Drawing.Point(1099, 249);
+            this.xa_label.Name = "xa_label";
+            this.xa_label.Size = new System.Drawing.Size(109, 18);
+            this.xa_label.TabIndex = 54;
+            this.xa_label.Text = "AUDIO FILES";
+            // 
+            // lng_label
+            // 
+            this.lng_label.AutoSize = true;
+            this.lng_label.BackColor = System.Drawing.Color.Transparent;
+            this.lng_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.lng_label.ForeColor = System.Drawing.Color.Black;
+            this.lng_label.Location = new System.Drawing.Point(1099, 220);
+            this.lng_label.Name = "lng_label";
+            this.lng_label.Size = new System.Drawing.Size(104, 26);
+            this.lng_label.TabIndex = 53;
+            this.lng_label.Text = "LANGUAGE FILE\r\n(.LNG <-> .TXT)";
+            // 
+            // md_label
+            // 
+            this.md_label.AutoSize = true;
+            this.md_label.BackColor = System.Drawing.Color.Transparent;
+            this.md_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.md_label.ForeColor = System.Drawing.Color.Black;
+            this.md_label.Location = new System.Drawing.Point(1099, 152);
+            this.md_label.Name = "md_label";
+            this.md_label.Size = new System.Drawing.Size(120, 26);
+            this.md_label.TabIndex = 52;
+            this.md_label.Text = "CHARACTER CONV\r\n(.PLY->.CTR->.OBJ)";
+            // 
+            // adv_searchxa
+            // 
+            this.adv_searchxa.Font = new System.Drawing.Font("Arial", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.adv_searchxa.Location = new System.Drawing.Point(1191, 222);
+            this.adv_searchxa.Name = "adv_searchxa";
+            this.adv_searchxa.Size = new System.Drawing.Size(25, 20);
+            this.adv_searchxa.TabIndex = 51;
+            this.adv_searchxa.Text = "...";
+            this.adv_searchxa.UseVisualStyleBackColor = true;
+            this.adv_searchxa.Click += new System.EventHandler(this.tools_xaSearch);
+            // 
+            // adv_xapath
+            // 
+            this.adv_xapath.Location = new System.Drawing.Point(1069, 222);
+            this.adv_xapath.Name = "adv_xapath";
+            this.adv_xapath.ReadOnly = true;
+            this.adv_xapath.Size = new System.Drawing.Size(116, 20);
+            this.adv_xapath.TabIndex = 50;
             // 
             // search_duckb
             // 
@@ -677,85 +756,6 @@
             // duckexe
             // 
             this.duckexe.FileName = "DUCKSTATION EXECUTABLE";
-            // 
-            // adv_xapath
-            // 
-            this.adv_xapath.Location = new System.Drawing.Point(1069, 222);
-            this.adv_xapath.Name = "adv_xapath";
-            this.adv_xapath.ReadOnly = true;
-            this.adv_xapath.Size = new System.Drawing.Size(116, 20);
-            this.adv_xapath.TabIndex = 50;
-            // 
-            // adv_searchxa
-            // 
-            this.adv_searchxa.Font = new System.Drawing.Font("Arial", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.adv_searchxa.Location = new System.Drawing.Point(1191, 222);
-            this.adv_searchxa.Name = "adv_searchxa";
-            this.adv_searchxa.Size = new System.Drawing.Size(25, 20);
-            this.adv_searchxa.TabIndex = 51;
-            this.adv_searchxa.Text = "...";
-            this.adv_searchxa.UseVisualStyleBackColor = true;
-            this.adv_searchxa.Click += new System.EventHandler(this.tools_xaSearch);
-            // 
-            // md_label
-            // 
-            this.md_label.AutoSize = true;
-            this.md_label.BackColor = System.Drawing.Color.Transparent;
-            this.md_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.md_label.ForeColor = System.Drawing.Color.Black;
-            this.md_label.Location = new System.Drawing.Point(1099, 152);
-            this.md_label.Name = "md_label";
-            this.md_label.Size = new System.Drawing.Size(120, 26);
-            this.md_label.TabIndex = 52;
-            this.md_label.Text = "CHARACTER CONV\r\n(.PLY->.CTR->.OBJ)";
-            // 
-            // lng_label
-            // 
-            this.lng_label.AutoSize = true;
-            this.lng_label.BackColor = System.Drawing.Color.Transparent;
-            this.lng_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.lng_label.ForeColor = System.Drawing.Color.Black;
-            this.lng_label.Location = new System.Drawing.Point(1099, 220);
-            this.lng_label.Name = "lng_label";
-            this.lng_label.Size = new System.Drawing.Size(104, 26);
-            this.lng_label.TabIndex = 53;
-            this.lng_label.Text = "LANGUAGE FILE\r\n(.LNG <-> .TXT)";
-            // 
-            // xa_label
-            // 
-            this.xa_label.AutoSize = true;
-            this.xa_label.BackColor = System.Drawing.Color.Transparent;
-            this.xa_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 11.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.xa_label.ForeColor = System.Drawing.Color.Black;
-            this.xa_label.Location = new System.Drawing.Point(1099, 249);
-            this.xa_label.Name = "xa_label";
-            this.xa_label.Size = new System.Drawing.Size(109, 18);
-            this.xa_label.TabIndex = 54;
-            this.xa_label.Text = "AUDIO FILES";
-            // 
-            // ot_label
-            // 
-            this.ot_label.AutoSize = true;
-            this.ot_label.BackColor = System.Drawing.Color.Transparent;
-            this.ot_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 12F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.ot_label.ForeColor = System.Drawing.Color.Black;
-            this.ot_label.Location = new System.Drawing.Point(1115, 190);
-            this.ot_label.Name = "ot_label";
-            this.ot_label.Size = new System.Drawing.Size(82, 20);
-            this.ot_label.TabIndex = 55;
-            this.ot_label.Text = "OTHERS";
-            // 
-            // duck_label
-            // 
-            this.duck_label.AutoSize = true;
-            this.duck_label.BackColor = System.Drawing.Color.Transparent;
-            this.duck_label.Font = new System.Drawing.Font("Microsoft Sans Serif", 14.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.duck_label.ForeColor = System.Drawing.Color.Black;
-            this.duck_label.Location = new System.Drawing.Point(1086, 240);
-            this.duck_label.Name = "duck_label";
-            this.duck_label.Size = new System.Drawing.Size(215, 24);
-            this.duck_label.TabIndex = 56;
-            this.duck_label.Text = "DUCKSTATION PATH";
             // 
             // modelfile
             // 
