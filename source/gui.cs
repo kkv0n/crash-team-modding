@@ -17,6 +17,7 @@ using Crash_Team_Mod_Header;
 using static Crash_Team_Mod_Header.modding;
 using System.Windows.Forms.VisualStyles;
 using System.Xml;
+using System.Timers;
 
 
 namespace Crash_Team_Mod
@@ -30,7 +31,7 @@ namespace Crash_Team_Mod
 
         public CTM()
         {
-            
+
 
             InitializeComponent();
             buttons();
@@ -51,7 +52,7 @@ namespace Crash_Team_Mod
             //fill the strings
             mod.PATHS_FILE = @".\paths.txt";
             mod.BACKUP_FOLDER = @"C:\ctr-mod-files";
-            mod.PREV_PSX_DIR = (Directory.Exists(Path.Combine(mod.BACKUP_FOLDER, "data"))) ? 
+            mod.PREV_PSX_DIR = (Directory.Exists(Path.Combine(mod.BACKUP_FOLDER, "data"))) ?
                 mod.BACKUP_FOLDER : System.IO.Directory.GetCurrentDirectory();
             mod.PSX_DIR = mod.PREV_PSX_DIR.Replace("\\", "/");
             mod.TEMP_SDK = Path.Combine(mod.BACKUP_FOLDER, "CTR-MOD-SDK");
@@ -66,6 +67,13 @@ namespace Crash_Team_Mod
 
         }
 
+
+
+
+
+        //TO DO: MAKE A SEPARATE FUNCTION TO PRINT MESSAGEBOXES
+
+
         //to avoid cmd closing after a task finished
         bool active_buildlist = false;
 
@@ -74,7 +82,7 @@ namespace Crash_Team_Mod
 
         void print_welcome() //print welcome message
         {
-            console_t.AppendText(@"
+            string intro = @"
 
         Welcome to Crash Team Modding:
             Modding for all people!
@@ -108,10 +116,24 @@ namespace Crash_Team_Mod
         - Convert lang files
             .lng <-> .txt
             
-        - Open XA files
+        - Open XA files";
 
-" + Environment.NewLine);
-
+            //need to simplify this later
+            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+            {
+                if (console_t.InvokeRequired) // TO DO: MAKE A SEPARATE FUNCTION TO PRINT TEXT IN THE CONSOLE
+                {
+                    console_t.Invoke((MethodInvoker)(() => console_t.AppendText(intro + Environment.NewLine)));
+                }
+                else
+                {
+                    console_t.AppendText(intro + Environment.NewLine);
+                }
+            }
+            else
+            {
+                console_t.AppendText(intro + Environment.NewLine);
+            }
         }
 
 
@@ -147,19 +169,24 @@ namespace Crash_Team_Mod
         {
             if (enable_mod.Checked) psx_execute((byte)psx.CLOSE);
 
-            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited) {
+            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited)
+            {
                 return;
             }
-            else { 
+            else
+            {
                 psx_execute((byte)psx.RELOAD);
             }
         }
 
 
+        bool closing = false;
 
         //close cmd when the app is closed
         void gui_closing(object sender, FormClosingEventArgs e)
         {
+            closing = true;
+
             if ((GET_MODDIR != null) && (temp_sdk))
 
             {
@@ -167,16 +194,7 @@ namespace Crash_Team_Mod
                 mod.MOD_DIR = mod.BACKUP_MODDIR;
                 change_paths((byte)paths.WRITE_PATHS);
             }
-            if (mod.NAME_ROM != null)
-            {
-                string romname = mod.NAME_ROM.Replace(".bin", "");
-                if (Directory.Exists(Path.Combine(mod.ISO_PATH, romname)))
-                {
-                    Directory.Delete(Path.Combine(mod.ISO_PATH, romname), true);
-                    File.Delete(Path.Combine(mod.ISO_PATH, romname + ".xml"));
-                }
-            }
-            psx_execute((byte)psx.CLOSE); 
+            psx_execute((byte)psx.CLOSE);
         }
 
 
@@ -219,24 +237,25 @@ namespace Crash_Team_Mod
 
             mod.psx_cmd.OutputDataReceived += (sender, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
+                if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
                 {
                     console_t.Invoke((Action)(() => console_t.AppendText(e.Data + Environment.NewLine)));
+
                     if (autoScroll) //avoid gui crashes
                     {
                         console_t.SelectionStart = console_t.Text.Length;
-                        console_t.ScrollToCaret(); 
+                        console_t.ScrollToCaret();
                     }
                     else
                     {
-                        console_t.SelectionStart = selectionStart; 
+                        console_t.SelectionStart = selectionStart;
                     }
                 }
             };
 
             mod.psx_cmd.ErrorDataReceived += (sender, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data))
+                if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
                     console_t.Invoke((Action)(() => console_t.AppendText($"[cmd] {e.Data}" + Environment.NewLine)));
             };
 
@@ -276,12 +295,17 @@ namespace Crash_Team_Mod
                     {
                         if (mod.psx_cmd != null && !mod.psx_cmd.HasExited)
                         {
+
                             psx_execute((byte)psx.RESTART);
-                            console_t.Text = string.Empty;
+                            console_t.SuspendLayout();
+                            console_t.Clear();
+                            console_t.ResumeLayout();
+                            if (!closing) print_welcome();
+
                         }
 
                         active_buildlist = false;
-                        
+
                         break;
                     }
 
@@ -289,17 +313,41 @@ namespace Crash_Team_Mod
 
                 case (byte)psx.RESTART:
                     {
-                       // if (mod.psx_cmd != null && !mod.psx_cmd.HasExited) mod.psx_cmd.Kill();
-
-                        foreach (Process python_process in Process.GetProcessesByName("python"))
-                        { 
-                            python_process.Kill();
+                        //somehow this crashes the app
+                        if (mod.psx_cmd != null && !mod.psx_cmd.HasExited) //if cmd process exists
+                        {
                             mod.psx_input.Close();
-                            python_process.WaitForExit();
-                            
+                            mod.psx_cmd.Kill();
+                        }
+                        else
+                        {
+
+                            if (Process.GetProcessesByName("python").Length > 0)
+                            {
+                                MessageBox.Show("previous python procces was found, press ok to close it"); //avoid annoying antivirus alert
+
+                                foreach (Process python_process in Process.GetProcessesByName("python")) //if cmd process not exists then search if python is open in the background
+                                {
+                                    python_process.Kill();
+                                    python_process.WaitForExit();
+
+                                }
+                            }
+
                         }
 
-                        console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine);
+                        if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+                        {
+                            if (console_t.InvokeRequired)
+                            {
+                                console_t.Invoke((MethodInvoker)(() => console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine)));
+                            }
+                            else
+                            {
+                                console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine);
+                            }
+                        }
+
                         break;
                     }
 
@@ -311,15 +359,17 @@ namespace Crash_Team_Mod
 
                         if (mod.PREV_SDK.Contains(" "))
                         {
+                            MessageBox.Show("your folder contains spaces, creating a temp folder... pls wait" + mod.TEMP_SDK); //trying to avoid the annoying antivirus alert
+
                             if (Directory.Exists(mod.BACKUP_MODDIR))
                             {
+                                MessageBox.Show("cleaning temp files..."); //trying to avoid the annoying antivirus alert
                                 Directory.Delete(mod.BACKUP_MODDIR, true);
                             }
 
                             if (!Directory.Exists(mod.BACKUP_FOLDER))
-                            System.IO.Directory.CreateDirectory(mod.BACKUP_FOLDER);
+                                System.IO.Directory.CreateDirectory(mod.BACKUP_FOLDER);
 
-                            MessageBox.Show("your folder contains spaces, creating a temp folder... pls wait" + mod.TEMP_SDK);
                             FileSystem.CopyDirectory(mod.PREV_SDK, mod.TEMP_SDK, true);
                             temp_sdk = true;
 
@@ -340,10 +390,10 @@ namespace Crash_Team_Mod
                             return;
                         }
 
-                        string romname = mod.NAME_ROM.Replace(".bin", "");
+                        string romname = mod.NAME_ROM.Replace(".bin", ""); //TO DO: replace this with getfilenamewithoutextension
                         string executable = mod.DUCK_PATH;
                         mod.DESIRED_ROM = (!rebuild_rom) ?
-                        Path.Combine(mod.ISO_PATH, romname + "_" + mod.MOD_NAME + ".bin")  : mod.MODDED_ROM;
+                        Path.Combine(mod.ISO_PATH, romname + "_" + mod.MOD_NAME + ".bin") : mod.MODDED_ROM;
 
                         if (!File.Exists(mod.DESIRED_ROM))
                         {
@@ -360,7 +410,7 @@ namespace Crash_Team_Mod
 
                 case (byte)psx.OPEN:
                     {
-                        if(!Directory.Exists(mod.PREV_PSX_DIR))
+                        if (!Directory.Exists(mod.PREV_PSX_DIR))
                         {
                             MessageBox.Show("error: cant find data folder, data folder is lost, pls download the app again");
                             return;
@@ -414,12 +464,11 @@ namespace Crash_Team_Mod
             }
             if (todo >= (byte)psx.COMPILE)
             {
-                commands(todo);
                 if (todo == (byte)psx.CLEAN_C)
                 {
-                    console_t.Text = String.Empty;
                     print_welcome();
                 }
+                commands(todo);
             }
         }
 
@@ -431,23 +480,25 @@ namespace Crash_Team_Mod
         {
             if ((temp_sdk) && (command < (byte)region.CTR_USA)) //refresh the temp sdk with latest changes in the folder
             {
+                MessageBox.Show("updating temp folder..."); //trying to avoid the annoying antivirus alert
+
                 foreach (var moddir in Directory.GetFileSystemEntries(mod.BACKUP_MODDIR)) //copy temp mod folder
                 {
-     
+
                     if (Path.GetFileName(moddir) == "buildList.txt") //skip buildList because it breaks the program
                     {
                         continue;
                     }
 
-        
+
                     string files = Path.Combine(mod.MOD_DIR, Path.GetFileName(moddir));
 
-           
+
                     if (File.Exists(moddir))
                     {
-                        File.Copy(moddir, files, true); 
+                        File.Copy(moddir, files, true);
                     }
-          
+
                     else if (Directory.Exists(moddir))
                     {
                         Directory.CreateDirectory(files);
@@ -458,10 +509,9 @@ namespace Crash_Team_Mod
                     }
                 }
 
-                MessageBox.Show("temp folder was updated!");
 
 
-                
+
 
 
             }
@@ -485,23 +535,43 @@ namespace Crash_Team_Mod
             "PAL SELECTED", "NTSC-J SELECTED", "PROTO SEP 3 SELECTED", "JAPAN TRIAL SELECTED"
             };
 
-
+            //probably dead code, need to refactorize later
             if ((mod.psx_cmd == null || mod.psx_cmd.HasExited)) //if cmd is closed
             {
                 byte operation = (byte)(((byte)region.CTR_USA - (byte)psx.COMPILE) & 0xFF);
 
                 // only show warning if this is not called by version buttons
-                if (command < operation)MessageBox.Show("The console is not open, first drag a buildlist in the square at the right side.");
+                if (command < operation) MessageBox.Show("The console is not open, first drag a buildlist in the square at the right side.");
 
                 return;
 
             }
 
+            // a lot of things to prevent the cmd crashing
+            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+            {
+                if (console_t.InvokeRequired)
+                {
+                    console_t.Invoke((MethodInvoker)(() => console_t.AppendText(TASK_TEXT[command] + Environment.NewLine)));
+                }
+                else
+                {
+                    console_t.AppendText(TASK_TEXT[command] + Environment.NewLine);
+                }
 
 
-            mod.psx_input.WriteLine(ACTION[command]);
-            console_t.AppendText(TASK_TEXT[command] + Environment.NewLine);
-            mod.psx_input.Flush();
+                //Thread.Sleep(850); //avoid cmd crashing
+
+                mod.psx_input.WriteLine(ACTION[command]);
+                mod.psx_input.Flush();
+            }
+            else
+            {
+                MessageBox.Show("the cmd is busy, try again in a few seconds");
+            }
+
+
+
 
 
 
@@ -524,8 +594,8 @@ namespace Crash_Team_Mod
 
 
 
-                drag_buildlist.Enabled = (swap_buttons) ? false : true;
-                prev_settingsb.Enabled = (swap_buttons) ? false : true;
+            drag_buildlist.Enabled = (swap_buttons) ? false : true;
+            prev_settingsb.Enabled = (swap_buttons) ? false : true;
 
 
             //block modding buttons if the checkbox is not enabled
@@ -602,7 +672,7 @@ namespace Crash_Team_Mod
                     }
 
                 }
-                else 
+                else
                 {
 
                     foreach (var path in replacements)
@@ -662,7 +732,7 @@ namespace Crash_Team_Mod
         {
 
             List<Control> hide = new List<Control> { dis_b, tex_b, log_b, comp_b, cleanc_b, buildc_b, exc_b, xd_b, cleanr_b, psx_r,
-            usa_b, jap_b, pal_b, sep3_b, jtrial_b, ext_toolsb, adv_toolsb, rebuild_toolsb, xdelta_toolsb, console_t, enable_mod, 
+            usa_b, jap_b, pal_b, sep3_b, jtrial_b, ext_toolsb, adv_toolsb, rebuild_toolsb, xdelta_toolsb, console_t, enable_mod,
             drag_buildlist, d_label, db_label, m_label, drag_buildlist, openr_b, prev_settingsb};
 
 
@@ -672,20 +742,20 @@ namespace Crash_Team_Mod
             r_label.Visible = (swap != (byte)gui.SET_DUCK_PATH) ? true : false;
 
             foreach (Control control in groupBox1.Controls)
-                {
+            {
 
                 if (hide.Contains(control))
-                    {
+                {
                     if (swap > (byte)gui.MAIN)
-                     {
+                    {
                         control.Hide();
-                     }
-                     else
-                     {
+                    }
+                    else
+                    {
                         control.Show();
-                     }
+                    }
                 }
-          }
+            }
             if (swap == (byte)gui.SET_DUCK_PATH)
             {
                 adv_goback.Location = new Point(420, 230);
@@ -719,7 +789,7 @@ namespace Crash_Team_Mod
                 lng_label.Location = new Point(24, 20);
                 md_label.Location = new Point(240, 20);
                 xa_label.Location = new Point(24, 159);
-                 
+
             }
             else if (swap == (byte)gui.MAIN)
             {
@@ -749,7 +819,7 @@ namespace Crash_Team_Mod
                 xa_label.Location = new Point(1064, 243);
                 duck_label.Location = new Point(1064, 243);
             }
-            
+
         }
 
         bool rebuild_rom = false; //select the current rom for duckstation
@@ -764,7 +834,6 @@ namespace Crash_Team_Mod
             prev_settingsb.Checked = false;
             prev_settingsb.Enabled = true;
 
-            print_welcome();
         }
 
 
@@ -782,12 +851,13 @@ namespace Crash_Team_Mod
                 //if rom name hace spaces
                 if (romfile.FileName.Contains(" "))
                 {
+                    MessageBox.Show("your rom path contains spaces, a temp folder will be created");
+
                     if (!Directory.Exists(mod.BACKUP_FOLDER))
                     {
                         System.IO.Directory.CreateDirectory(mod.BACKUP_FOLDER);
                     }
 
-                    MessageBox.Show("your rom path contains spaces, a temp folder will be created");
                     mod.TEMP_ROM = Path.Combine(Path.Combine(mod.BACKUP_FOLDER, "rom"), "ctr.bin");
                     FileSystem.CopyFile(romfile.FileName, mod.TEMP_ROM, true);
                     Process.Start("explorer.exe", System.IO.Directory.GetParent(mod.TEMP_ROM).FullName);
@@ -831,7 +901,7 @@ namespace Crash_Team_Mod
             string PREV_COMPILE_LIST = Path.Combine(PREV_MODDIR, "buildList.txt");
             mod.MOD_NAME = System.IO.Path.GetFileName(PREV_MODDIR);
             PREV_MODDIR += "\\";
-            mod.MOD_DIR =  PREV_MODDIR.Replace("\\", "/");
+            mod.MOD_DIR = PREV_MODDIR.Replace("\\", "/");
 
             MessageBox.Show(mod.BACKUP_MODDIR);
 
@@ -911,7 +981,7 @@ namespace Crash_Team_Mod
         }
 
         //set japanese trial rom as default
-       private void select_jtrial(object sender, EventArgs e)
+        private void select_jtrial(object sender, EventArgs e)
         {
             set_rom_region((byte)region.CTR_J_TRIAL);
         }
@@ -966,6 +1036,26 @@ namespace Crash_Team_Mod
         //clean rom files
         private void clean_rom(object sender, EventArgs e)
         {
+            if (mod.NAME_ROM != null)
+            {
+                string romname = Path.GetFileNameWithoutExtension(mod.NAME_ROM);
+
+                if (Directory.Exists(Path.Combine(mod.ISO_PATH, romname)))
+                {
+                    DialogResult result = MessageBox.Show($"should delete rom temp folder: \"{Path.Combine(mod.ISO_PATH, romname)}\" ?",
+                    "Confirm", MessageBoxButtons.YesNo);
+
+                    if (DialogResult == DialogResult.Yes) //avoid antivirus alert
+                    {
+                        Directory.Delete(Path.Combine(mod.ISO_PATH, romname), true);
+                        File.Delete(Path.Combine(mod.ISO_PATH, romname + ".xml"));
+                    }
+
+                }
+            }
+
+
+
             psx_execute((byte)psx.CLEAN_R);
         }
 
@@ -1025,7 +1115,7 @@ namespace Crash_Team_Mod
 
             psx_execute((byte)psx.RELOAD);
         }
-    
+
 
 
         //if loading previous presets
@@ -1042,7 +1132,7 @@ namespace Crash_Team_Mod
                 return;
             }
 
-                string[] presets = {mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
+            string[] presets = { mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
 
 
             for (i = 0; i < 2; i++)
@@ -1064,7 +1154,7 @@ namespace Crash_Team_Mod
             psx_execute((byte)psx.TEMP_PATH);
 
             //open the buildList
-            psx_execute((byte)psx.OPEN); 
+            psx_execute((byte)psx.OPEN);
             active_buildlist = true;
 
             prev_settingsb.Enabled = false;
@@ -1079,7 +1169,7 @@ namespace Crash_Team_Mod
         }
 
 
-        
+
         private void duck_Search(object sender, EventArgs e)
         {
             if (duckexe.ShowDialog() == DialogResult.OK)
@@ -1112,10 +1202,10 @@ namespace Crash_Team_Mod
                 WorkingDirectory = workdir,
                 RedirectStandardOutput = (mode < 2 || mode == 6) ? false : true,
                 RedirectStandardError = (mode < 2 || mode == 6) ? false : true,
-                UseShellExecute = (mode == 1 || mode > 2 && mode < 5 ) ? true : false,
+                UseShellExecute = (mode == 1 || mode > 2 && mode < 5) ? true : false,
                 CreateNoWindow = true
             };
-            using (Process process = new Process {StartInfo = exec_process})
+            using (Process process = new Process { StartInfo = exec_process })
             {
                 process.Start();
 
@@ -1268,7 +1358,7 @@ namespace Crash_Team_Mod
 
                 case ((byte)modding_tools.XA_OPEN):
                     {
-                        if(mod.XA_PATH == null || !File.Exists(mod.XA_PATH))
+                        if (mod.XA_PATH == null || !File.Exists(mod.XA_PATH))
                         {
                             MessageBox.Show("cant find" + mod.XA_PATH);
                             return;
