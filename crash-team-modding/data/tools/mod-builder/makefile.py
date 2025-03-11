@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import textwrap
 import shlex
+import pathlib
 from time import time
 
 # import pdb # debugging
@@ -76,7 +77,7 @@ class Makefile:
         self.ovrs = []
         for instance in self.list_compile_lists:
             for src in instance.source: #pathlibs
-                self.srcs.append(str(src).replace("\\", "/").replace(str(MOD_DIR), "")) #bruh
+                self.srcs.append(pathlib.Path(src).relative_to(pathlib.Path(MOD_DIR).resolve())) #bruh X2
             self.ovrs.append((instance.section_name, instance.source, instance.address))
             # self.ovr_section += "." + instance.section_name + " "
             self.ovr_section.append("." + instance.section_name)
@@ -103,7 +104,7 @@ class Makefile:
             for src in source: # pathlib objects
                 # TODO: Utilize pathlib completely
                 src_o = src.with_suffix(".o") # remove suffix
-                src_o = str(src_o).replace("\\", "/").replace(str(MOD_DIR), "")
+                src_o = pathlib.Path(src_o).relative_to(pathlib.Path(MOD_DIR).resolve()) #bruh X3
                 text.append(" " * 12 + f"KEEP({src_o}(.text*))\n")
                 rodata.append(" " * 12 + f"KEEP({src_o}(.rodata*))\n")
                 sdata.append(" " * 12 + f"KEEP({src_o}(.sdata*))\n")
@@ -141,7 +142,7 @@ class Makefile:
     def build_makefile(self) -> bool:
         self.set_base_address()
         self.build_makefile_objects()
-        srcs_str = " ".join([i for i in self.srcs])
+        srcs_str = " ".join(map(str, self.srcs)) #without this mod_dir folder is inaccurate in decomp folder
         PCHS_PREV = os.path.join(GAME_INCLUDE_PATH, self.pch)
         buffer = f"""
         MODDIR := {os.path.abspath(COMPILE_FOLDER)}
@@ -253,6 +254,8 @@ class Makefile:
         
         # These are relaive to the current Makefile
         if (not os.path.isfile(MAP_INIT_PATH)) or (not os.path.isfile(ELF_INIT_PATH)):
+            make_error = "ERROR: cant find mod.elf/.map"
+            print(make_error)
             self.move_temp_files()
             self.delete_temp_files()
             logger.critical(f"Compilation completed but unsuccessful. ({total_time}s)")

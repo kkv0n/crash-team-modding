@@ -1,9 +1,11 @@
+#TO DO: CHANGE PATHLIB TO OS PATH
+
 """
 Parses the buildList.txt file line by line assuming a tabluar format
 Use pathlib.Path().resolve() to handle concatenation of ../.. syntax
 """
 import _files # check_file
-from common import COMMENT_SYMBOL, CONFIG_PATH, OUTPUT_FOLDER, MOD_PATH, is_number
+from common import COMMENT_SYMBOL, CONFIG_PATH, OUTPUT_FOLDER, is_number, COMPILE_FOLDER
 from syms import Syms
 
 import json
@@ -27,10 +29,9 @@ def error_print(error: str):
     print_errors[0] = True
 
 class CompileList:
-    def __init__(self, line: str, sym: Syms, prefix: str) -> None:
+    def __init__(self, line: str, sym: Syms) -> None:
         self.original_line = line
         self.sym = sym
-        self.prefix = pathlib.Path(prefix).resolve() # path prefix
         self.ignore = False
         self.is_bin = False
         self.path_build_list = None
@@ -105,24 +106,23 @@ class CompileList:
         self.source = []
         dict_folders = dict()
         for src in srcs:
-            prefix_path = Path(self.prefix)
-            src_path = (prefix_path / src).resolve()
-            directory = src_path.parent
-            regex = re.compile(src_path.name.replace("*", "(.*)"))
-            output_name = src_path.stem
+            src_path = pathlib.Path(os.path.join(COMPILE_FOLDER, src))
+            directory = pathlib.Path(os.path.dirname(src_path))
+            regex = re.compile(pathlib.Path(src_path).name.replace("*", "(.*)"))
+            output_name = pathlib.Path(src_path).stem
             if not directory in dict_folders:
                 for _, _, files in os.walk(directory):
                     dict_folders[directory] = files
                     break
             # TODO: Figure out why we need this weird if-block
             # TODO: Workaround until OUTPUT_FOLDER is a pathlib object
-            if (directory.name + os.sep == OUTPUT_FOLDER) and output_name in sections:
-                self.source.append(directory / src_path.name)
+            if (pathlib.Path(directory).name == "output") and output_name in sections:
+                self.source.append(pathlib.Path(os.path.join(directory, os.path.basename(src_path))))
             else:
                 if directory in dict_folders:
                     for file in dict_folders[directory]:
                         if regex.search(file):
-                            self.source.append(directory / file)
+                            self.source.append(pathlib.Path(os.path.join(directory, file)))
                 else:
                     logger.warning(f"directory {directory} not found at line: {line_count[0]}: {self.original_line}")
                     self.ignore = True
@@ -137,7 +137,7 @@ class CompileList:
         else:
             self.section_name = self.get_section_name_from_filepath(self.source[0])
 
-        extension = self.source[0].suffix
+        extension = pathlib.Path(self.source[0]).suffix
         if extension.lower() not in [".c", ".s", ".cpp", ".cc"]:
             self.is_bin = True
             self.ignore = True
@@ -164,7 +164,7 @@ class CompileList:
         Removes dots in the extension and replaces hypens with underscores
         TODO: This function name is unintuitive
         """
-        return filepath.name.replace(".", "").replace("-", "_")
+        return pathlib.Path(filepath).name.replace(".", "").replace("-", "_")
 
     def calculate_address_base(self, symbol: str, offset: int) -> int:
         addr = self.sym.get_address(symbol)
@@ -178,7 +178,7 @@ class CompileList:
     def get_output_name(self) -> str:
         if self.is_bin:
             return self.source[0]
-        return pathlib.Path(self.prefix) / OUTPUT_FOLDER / (self.section_name + ".bin")
+        return pathlib.Path(os.path.join(OUTPUT_FOLDER, self.section_name + ".bin"))
 
     def should_ignore(self) -> bool:
         return self.ignore

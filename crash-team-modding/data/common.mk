@@ -11,7 +11,7 @@ CPPFLAGS += -I$(MODDIR)
 
 ifeq ($(USE_MININOOB),true)
   CPPFLAGS += -I$(MINI_INCLUDE)
-  LDFLAGS += -L$(MINI_LIB)minin00b/lib/
+  LDFLAGS += -L$(MINI_LIB)
   LDFLAGS += -Wl,--start-group
   LDFLAGS += -l:libc.a
   LDFLAGS += -l:psxcd.a

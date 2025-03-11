@@ -198,7 +198,7 @@ class Redux:
             free_sections()
             with open(build_list, "r") as file:
                 for line in file:
-                    cl = CompileList(line, sym, prefix)
+                    cl = CompileList(line, sym)
                     if not cl.should_build():
                         continue
                     bin = cl.get_output_name() # pathlib object
@@ -427,7 +427,7 @@ class Redux:
             free_sections()
             with open(bl, "r") as bl_file:
                 for line in bl_file:
-                    instance_cl = CompileList(line, sym, prefix)
+                    instance_cl = CompileList(line, sym)
 
                     # check if buildList line is for a valid patch file
                     # in this context, a valid patch file is any binary (ergo, non-code (i.e. .c, .s, .cpp)) file which

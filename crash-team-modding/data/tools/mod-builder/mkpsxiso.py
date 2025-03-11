@@ -1,6 +1,7 @@
 """
 TO DO: RESTORE GAME_OPTIONS --PENTA3
 """
+# TO DO: LOAD ROM PATH & NAME IN EACH BUILD DIRECTLY FROM THE TXT INSTEAD THAN USING GLOBAL DECLARATION
 # im not going to modify this just to use ctr-tools rebuild functions, who cares
 
 import _files # check_file, delete_file, create_directory, delete_directory
@@ -120,7 +121,7 @@ class Mkpsxiso:
             free_sections()
             with open(bl, "r") as file:
                 for line in file:
-                    instance_cl = CompileList(line, sym, prefix=COMPILE_FOLDER)
+                    instance_cl = CompileList(line, sym)
                     if not instance_cl.should_build():
                         continue
 

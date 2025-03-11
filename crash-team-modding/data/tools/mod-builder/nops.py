@@ -38,7 +38,7 @@ class Nops:
             free_sections()
             with open(bl, "r") as file:
                 for line in file:
-                    cl = CompileList(line, sym, prefix)
+                    cl = CompileList(line, sym)
                     if not cl.should_build():
                         continue
                     bin = cl.get_output_name()

@@ -12,7 +12,7 @@ from makefile import Makefile, clean_pch
 from compile_list import CompileList, free_sections, print_errors
 from syms import Syms
 from redux import Redux
-from common import MOD_NAME, GAME_NAME, LOG_FILE, COMPILE_LIST, DEBUG_FOLDER, BACKUP_FOLDER, OUTPUT_FOLDER, COMPILATION_RESIDUES, TEXTURES_FOLDER, TEXTURES_OUTPUT_FOLDER, IS_WINDOWS_OS, request_user_input, cli_clear, DISC_PATH, SETTINGS_PATH, COMPILE_FOLDER, GCC_ELF_FILE, MIPS_PATH, PATHS_FILE, PYTHON_PORTABLE, show_paths
+from common import MOD_NAME, GAME_NAME, LOG_FILE, COMPILE_LIST, DEBUG_FOLDER, BACKUP_FOLDER, OUTPUT_FOLDER, COMPILATION_RESIDUES, TEXTURES_FOLDER, TEXTURES_OUTPUT_FOLDER, request_user_input, cli_clear, DISC_PATH, SETTINGS_PATH, COMPILE_FOLDER, GCC_ELF_FILE, MIPS_PATH, PATHS_FILE, PYTHON_PORTABLE, show_paths
 from mkpsxiso import Mkpsxiso
 from nops import Nops
 from image import create_images, clear_images, dump_images
@@ -71,10 +71,7 @@ class Main:
 
     def update_title(self):
         """ TODO: Identify these commands """
-        if IS_WINDOWS_OS:
-            os.system("title " + self.window_title)
-        else:
-            os.system('echo -n -e "\\033]0;' + self.window_title + '\\007"')
+        os.system("title " + self.window_title)
 
     def get_options(self) -> int:
         intro_msg = """
@@ -126,7 +123,7 @@ class Main:
         free_sections()
         with open(COMPILE_LIST, "r") as file:
             for line in file:
-                cl = CompileList(line, instance_symbols, COMPILE_FOLDER)
+                cl = CompileList(line, instance_symbols)
                 if not cl.should_ignore():
                     make.add_cl(cl)
         if print_errors[0]:
@@ -136,8 +133,6 @@ class Main:
                 
         if make.build_makefile():
             if not make.make():
-                make_error = "ERROR: possible error when opening mod.elf/.map"
-                print(make_error)
                 self.abort_compilation(is_warning=True)
         else:
             self.abort_compilation(is_warning=True)
@@ -187,8 +182,8 @@ class Main:
         path_in = os.path.abspath(GCC_ELF_FILE)
         path_out = os.path.join(DEBUG_FOLDER, "disasm.txt")
         with open(path_out, "w") as file:
-            mips_diss = os.path.join(MIPS_PATH, "mipsel-none-elf-objdump")
-            command = [mips_diss, "-d", path_in]
+            mips_disasm = os.path.join(MIPS_PATH, "mipsel-none-elf-objdump")
+            command = [mips_disasm, "-d", path_in]
             subprocess.call(command, stdout=file, stderr=subprocess.STDOUT)
         logger.info(f"Disassembly saved at {path_out}")
 

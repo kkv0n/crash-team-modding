@@ -1,3 +1,4 @@
+#TO DO: MERGE ALL THE UNNECESARY STRINGS
 """
 Contains all of the global directory names and functions for user input
 TODO: Make the user pass in the game dir
@@ -106,7 +107,7 @@ using_cl_args = len(sys.argv) > 1
 
 
 
-IS_WINDOWS_OS = sys.platform == "win32"
+sys.platform == "win32"
 """
 FILE PATHS
 """
@@ -136,7 +137,6 @@ UNUSED
 DIR_SYMBOLS = os.path.join(DIR_GAME, "symbols")
 PLUGIN_PATH = os.path.join(DIR_GAME, "plugins")
 GAME_INCLUDE_PATH = os.path.join(DIR_GAME, "include")
-MOD_PATH = os.path.join(DIR_GAME, "mods")
 OVERLAYLD = os.path.join(COMPILE_FOLDER, "overlay.ld")
 FILE_LIST = "fileList.txt"
 SRC_FOLDER = "src/"
