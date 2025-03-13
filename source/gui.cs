@@ -246,6 +246,11 @@ namespace Crash_Team_Mod
             delay_logs.Tick += (s, e) =>
             {
 
+                if (enable_mod.Checked || mod.psx_cmd == null && mod.psx_cmd.HasExited)
+                {
+                    delay_logs.Stop();
+                    return;
+                }
 
                 if (!console_t.IsDisposed)
                 {
@@ -266,12 +271,6 @@ namespace Crash_Team_Mod
                         }
 
                     }));
-
-                    if (enable_mod.Checked)
-                    {
-                        delay_logs.Stop();
-                        return;
-                    }
 
                 }
             };
@@ -538,7 +537,7 @@ namespace Crash_Team_Mod
 
             }
 
-            if (todo >= (byte)psx.COMPILE && todo < (byte)region.CTR_USA && todo != (byte)psx.BUILD_ROM)
+            if (todo >= (byte)psx.COMPILE && todo < (byte)region.CTR_USA)
             {
                 using (var fs = new FileStream(Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt"), FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
                 using (var writer = new StreamWriter(fs))
@@ -550,15 +549,8 @@ namespace Crash_Team_Mod
             if (todo >= (byte)psx.COMPILE)
             {
                 commands(todo);
-
-                if (todo == (byte)psx.BUILD_ROM)
-                {
-                    console_t.Invoke((Action)(() =>
-                {
-                    console_t.SelectionStart = console_t.Text.Length;
-                    console_t.ScrollToCaret();
-                }));
-                }
+            
+             
             }
         }
 
@@ -1201,6 +1193,8 @@ namespace Crash_Team_Mod
         //if loading previous presets
         private void load_presets(object sender, EventArgs e)
         {
+            if (enable_mod.Checked) return;
+
             byte i;
 
             //load paths from the txt

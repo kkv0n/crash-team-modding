@@ -22,9 +22,9 @@ from c import export_as_c
 import logging
 import os
 import pathlib
+import glob
 import subprocess
 import sys
-from glob import glob
 import game_options
 
 logger = logging.getLogger(__name__)
