@@ -496,6 +496,7 @@
             this.console_t.Location = new System.Drawing.Point(244, 47);
             this.console_t.Name = "console_t";
             this.console_t.ReadOnly = true;
+            this.console_t.ScrollBars = System.Windows.Forms.RichTextBoxScrollBars.Vertical;
             this.console_t.Size = new System.Drawing.Size(488, 386);
             this.console_t.TabIndex = 23;
             this.console_t.Text = "";

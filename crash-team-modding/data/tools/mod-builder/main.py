@@ -75,6 +75,22 @@ class Main:
 
     def get_options(self) -> int:
         intro_msg = """
+        BUILDLIST WAS SELECTED:
+
+        Ctr-mod-sdk:
+        - Compile
+        - Clean Compilation files
+        - Build Modded ISO
+        - Extract Vanilla ISO
+        - Create xdelta patch
+        - Clean ISO files
+
+        Debug:
+        - Generate Disassemble Elf
+        - Export textures as C file
+        - Open ROM with duckstation
+        
+        
         v0.2 by penta3
         Choose button to start.
         """
@@ -146,7 +162,7 @@ class Main:
         clean_pch()
         for file in COMPILATION_RESIDUES:
             _files.delete_file(file)
-        leftovers = glob("**/*.o", recursive=True) + glob("**/*.dep", recursive=True)
+        leftovers = glob.glob(f"{COMPILE_FOLDER}/**/*.o", recursive=True) + glob.glob(f"{COMPILE_FOLDER}/**/*.dep", recursive=True)
         for leftover in leftovers:
             _files.delete_file(leftover)
 

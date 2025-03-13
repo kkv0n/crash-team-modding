@@ -211,13 +211,6 @@ class Makefile:
         with open(COMP_SOURCE, "w") as file:
             file.write(buffer)
 
-    # Restoring the saved .o and .dep for faster compilation
-    def restore_temp_files(self) -> None:
-        if _files.check_file(COMP_SOURCE):
-            with open(COMP_SOURCE, "r") as file:
-                for line in file:
-                    line = [l.strip() for l in line.split()]
-                    shutil.move(line[0], line[1])
 
     def make(self) -> bool:
         """
@@ -228,7 +221,6 @@ class Makefile:
         _files.create_directory(BACKUP_FOLDER)
         _files.create_directory(OBJ_FOLDER)
         _files.create_directory(DEP_FOLDER)
-        self.restore_temp_files()
         cli_clear()
         print(f"Compiling: {MOD_NAME}...")
         start_time = time()

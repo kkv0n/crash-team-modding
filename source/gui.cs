@@ -35,7 +35,7 @@ namespace Crash_Team_Mod
 
             InitializeComponent();
             buttons();
-            print_welcome();
+            print_welcome(true);
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.gui_closing);
             romfile.Filter = "CTR ROM (*.bin) | *.bin; | All files (*.*) | *.*";
             duckexe.Filter = "DUCKSTATION (*.exe) | *.exe;";
@@ -69,7 +69,18 @@ namespace Crash_Team_Mod
 
 
 
+        void create_log()
+        {
+            string logfile = Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt");
 
+            using (var fs = new FileStream(logfile, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+            using (var writer = new StreamWriter(fs))
+            {
+                //clean the file/create a new one
+            }
+            update_logs();
+
+        }
 
         //TO DO: MAKE A SEPARATE FUNCTION TO PRINT MESSAGEBOXES
 
@@ -80,18 +91,24 @@ namespace Crash_Team_Mod
         bool temp_sdk = false;
 
 
-        void print_welcome() //print welcome message
+        void print_welcome(bool intro) //print welcome message
         {
-            string intro = @"
+            string intro_text = "text";
+
+            if (intro)
+            {
+                intro_text = @"
 
         Welcome to Crash Team Modding:
             Modding for all people!
             
-        Waiting for a Buildlist...
+        Waiting for user selection...
         
         These are the available options
-        
-        Mods:
+
+        BUILDLIST:
+
+        Ctr-mod-sdk:
         - Compile
         - Clean Compilation files
         - Build Modded ISO
@@ -104,7 +121,9 @@ namespace Crash_Team_Mod
         - Export textures as C file
         - Open ROM with duckstation
         
-        Ctr-tools:
+        CTR-TOOLS:
+
+        Rom modding:
         - Extract
         - Rebuild
         - Generate xdelta
@@ -117,24 +136,42 @@ namespace Crash_Team_Mod
             .lng <-> .txt
             
         - Open XA files";
+            }
 
-            //need to simplify this later
-            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+            else if (!intro)
             {
-                if (console_t.InvokeRequired) // TO DO: MAKE A SEPARATE FUNCTION TO PRINT TEXT IN THE CONSOLE
-                {
-                    console_t.Invoke((MethodInvoker)(() => console_t.AppendText(intro + Environment.NewLine)));
-                }
-                else
-                {
-                    console_t.AppendText(intro + Environment.NewLine);
-                }
+                intro_text = @"
+
+        CTR-TOOLS WAS SELECTED
+
+       These are the available options:
+
+        Debug:
+        - Open ROM with duckstation
+        
+        Rom modding:
+        - Extract
+        - Rebuild
+        - Generate xdelta
+        
+        Advanced:
+        - Convert Character Models
+           ->.ply -> .ctr -> .obj
+           
+        - Convert lang files
+            .lng <-> .txt
+            
+        - Open XA files
+";
             }
-            else
-            {
-                console_t.AppendText(intro + Environment.NewLine);
-            }
+
+            console_t.SuspendLayout();
+            console_t.Text = intro_text;
+            console_t.ResumeLayout();
         }
+
+
+
 
 
 
@@ -198,9 +235,49 @@ namespace Crash_Team_Mod
         }
 
 
+        System.Windows.Forms.Timer delay_logs;
+
+        //fix this later
+        void update_logs()
+        {
+
+            delay_logs = new System.Windows.Forms.Timer { Interval = 500 };
+            delay_logs.Start();
+            delay_logs.Tick += (s, e) =>
+            {
 
 
+                if (!console_t.IsDisposed)
+                {
+                    console_t.Invoke((Action)(() =>
+                    {
 
+
+                        using (var fs = File.Open(Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt"), FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        using (var reader = new StreamReader(fs))
+                        {
+
+                            console_t.SuspendLayout();
+
+                            console_t.Text = reader.ReadToEnd();
+
+                            console_t.ResumeLayout();
+
+                        }
+
+                    }));
+
+                    if (enable_mod.Checked)
+                    {
+                        delay_logs.Stop();
+                        return;
+                    }
+
+                }
+            };
+
+
+        }
 
 
 
@@ -215,9 +292,9 @@ namespace Crash_Team_Mod
             string python = Path.GetFullPath(Path.Combine(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "Python"), "Python310"), "python.exe"));
             string builder = Path.GetFullPath(Path.Combine(Path.Combine(mod.PSX_TOOLS_PATH, "mod-builder"), "main.py"));
 
-            //the gui can get frozen without this for some reason
-            int selectionStart = console_t.SelectionStart;
-            bool autoScroll = console_t.SelectionStart == console_t.Text.Length;
+            string logfile = Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt");
+
+
 
             mod.psx_cmd = new Process
             {
@@ -237,32 +314,31 @@ namespace Crash_Team_Mod
 
             mod.psx_cmd.OutputDataReceived += (sender, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    console_t.SuspendLayout();
-                    console_t.Invoke((Action)(() => console_t.AppendText(e.Data + Environment.NewLine)));
-                    console_t.ResumeLayout();
-
-                    if (autoScroll) //avoid gui crashes
+                    using (var fs = new FileStream(logfile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                    using (var writer = new StreamWriter(fs))
                     {
-                        console_t.SelectionStart = console_t.Text.Length;
-                        console_t.ScrollToCaret();
-                    }
-                    else
-                    {
-                        console_t.SelectionStart = selectionStart;
+                        writer.WriteLine(e.Data + Environment.NewLine);
                     }
                 }
             };
 
             mod.psx_cmd.ErrorDataReceived += (sender, e) =>
             {
-                if (!string.IsNullOrEmpty(e.Data) && !console_t.IsDisposed)
+                if (!string.IsNullOrEmpty(e.Data))
                 {
-                    console_t.SuspendLayout();
-                    console_t.Invoke((Action)(() => console_t.AppendText($"[cmd] {e.Data}" + Environment.NewLine)));
-                    console_t.ResumeLayout();
+                    using (var fs = new FileStream(logfile, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                    using (var writer = new StreamWriter(fs))
+                    {
+                        writer.WriteLine($"[cmd] {e.Data}" + Environment.NewLine);
+                    }
                 }
+                console_t.Invoke((Action)(() =>
+                {
+                    console_t.SelectionStart = console_t.Text.Length;
+                    console_t.ScrollToCaret();
+                }));
             };
 
             mod.psx_cmd.Start();
@@ -303,10 +379,6 @@ namespace Crash_Team_Mod
                         {
 
                             psx_execute((byte)psx.RESTART);
-                            console_t.SuspendLayout();
-                            console_t.Clear();
-                            console_t.ResumeLayout();
-                            if (!closing) print_welcome();
 
                         }
 
@@ -342,19 +414,12 @@ namespace Crash_Team_Mod
 
                         }
 
-                        if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+                        if (mod.psx_cmd != null && !mod.psx_cmd.HasExited)
                         {
-                            if (console_t.InvokeRequired)
+                            using (var fs = new FileStream(Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+                            using (var writer = new StreamWriter(fs))
                             {
-                                console_t.SuspendLayout();
-                                console_t.Invoke((MethodInvoker)(() => console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine)));
-                                console_t.ResumeLayout();
-                            }
-                            else
-                            {
-                                console_t.SuspendLayout();
-                                console_t.AppendText("CMD WAS RESTARTED" + Environment.NewLine);
-                                console_t.ResumeLayout();
+                                writer.WriteLine("CMD WAS RESTARTED" + Environment.NewLine);
                             }
                         }
 
@@ -472,13 +537,28 @@ namespace Crash_Team_Mod
                     }
 
             }
+
+            if (todo >= (byte)psx.COMPILE && todo < (byte)region.CTR_USA && todo != (byte)psx.BUILD_ROM)
+            {
+                using (var fs = new FileStream(Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt"), FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+                using (var writer = new StreamWriter(fs))
+                {
+
+                }
+            }
+
             if (todo >= (byte)psx.COMPILE)
             {
-                if (todo == (byte)psx.CLEAN_C)
-                {
-                    print_welcome();
-                }
                 commands(todo);
+
+                if (todo == (byte)psx.BUILD_ROM)
+                {
+                    console_t.Invoke((Action)(() =>
+                {
+                    console_t.SelectionStart = console_t.Text.Length;
+                    console_t.ScrollToCaret();
+                }));
+                }
             }
         }
 
@@ -557,40 +637,19 @@ namespace Crash_Team_Mod
 
             }
 
-            // a lot of things to prevent the cmd crashing
-            if (mod.psx_cmd != null && !mod.psx_cmd.HasExited && mod.psx_input.BaseStream.CanWrite)
+            using (var fs = new FileStream(Path.Combine(Path.Combine(mod.PSX_DIR, "data"), "logs.txt"), FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using (var writer = new StreamWriter(fs))
             {
-                if (console_t.InvokeRequired)
-                {
-                    console_t.SuspendLayout();
-                    console_t.Invoke((MethodInvoker)(() => console_t.AppendText(TASK_TEXT[command] + Environment.NewLine)));
-                    console_t.ResumeLayout();
-                }
-                else
-                {
-                    console_t.SuspendLayout();
-                    console_t.AppendText(TASK_TEXT[command] + Environment.NewLine);
-                    console_t.ResumeLayout();
-                }
-
-
-                //Thread.Sleep(850); //avoid cmd crashing
-
-                mod.psx_input.WriteLine(ACTION[command]);
-                mod.psx_input.Flush();
-            }
-            else
-            {
-                MessageBox.Show("the cmd is busy, try again in a few seconds");
+                writer.WriteLine(TASK_TEXT[command] + Environment.NewLine);
             }
 
 
 
 
 
-
-
+            mod.psx_input.WriteLine(ACTION[command]);
         }
+
 
 
 
@@ -732,6 +791,8 @@ namespace Crash_Team_Mod
 
             if (task == (byte)paths.SAVE_DUCK) return;
 
+            if (mod.ISO_PATH == null) return;
+
             //set the path for ctr tools functions
             mod.MODDED_ROM = Path.Combine(mod.ISO_PATH, "ctr_rebuild.bin");
             mod.XDELTA_PATCH = Path.Combine(mod.ISO_PATH, "ctr_rebuild.xdelta");
@@ -844,6 +905,7 @@ namespace Crash_Team_Mod
         private void enable_mod_CheckedChanged(object sender, EventArgs e)
         {
             psx_execute((byte)psx.CLOSE);
+            print_welcome(!enable_mod.Checked);
             buttons();
             rebuild_rom ^= true;
 
@@ -904,6 +966,8 @@ namespace Crash_Team_Mod
                 MessageBox.Show("pls select a rom first");
                 return;
             }
+
+            create_log();
 
             // get the path of buildList.txt
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -1061,7 +1125,7 @@ namespace Crash_Team_Mod
                     DialogResult result = MessageBox.Show($"should delete rom temp folder: \"{Path.Combine(mod.ISO_PATH, romname)}\" ?",
                     "Confirm", MessageBoxButtons.YesNo);
 
-                    if (DialogResult == DialogResult.Yes) //avoid antivirus alert
+                    if (result == DialogResult.Yes) //avoid antivirus alert
                     {
                         Directory.Delete(Path.Combine(mod.ISO_PATH, romname), true);
                         File.Delete(Path.Combine(mod.ISO_PATH, romname + ".xml"));
@@ -1142,11 +1206,18 @@ namespace Crash_Team_Mod
             //load paths from the txt
             change_paths((byte)paths.READ_PATHS);
 
-            if (!File.Exists(mod.COMPILE_LIST))
+            if (mod.COMPILE_LIST == null)
             {
-                MessageBox.Show("invalid path, pls load a new buildlist");
+                MessageBox.Show("invalid buildlist path, pls load a new buildlist");
                 return;
             }
+
+            if (mod.ISO_PATH == null)
+            {
+                MessageBox.Show("invalid iso path, pls select a new one");
+                return;
+            }
+
 
             string[] presets = { mod.COMPILE_LIST, Path.Combine(mod.ISO_PATH, mod.NAME_ROM) };
 
@@ -1163,6 +1234,8 @@ namespace Crash_Team_Mod
                     return;
                 }
             }
+
+            create_log();
 
             rom.Text = Path.Combine(mod.ISO_PATH, mod.NAME_ROM);
 
@@ -1225,7 +1298,7 @@ namespace Crash_Team_Mod
             {
                 process.Start();
 
-                if ((mode == 1 || mode == 3 && mode > 4)) process.WaitForExit();
+                if ((mode == 1 || (mode >= 3 && mode != 4))) process.WaitForExit();
 
                 if (mode >= 2 && mode <= 5)
                 {
@@ -1254,11 +1327,13 @@ namespace Crash_Team_Mod
                 case ((byte)modding_tools.EXTRACT):
                     {
 
-                        if (!File.Exists(rom.Text) || rom.Text == String.Empty)
+                        if (!File.Exists(mod.ROM_TO_EXTRACT) || mod.ROM_TO_EXTRACT == null) //just in case
                         {
                             MessageBox.Show("Error! Cant find the rom.");
                             return;
                         }
+
+                        MessageBox.Show("Extracting the rom... pls wait");
 
                         mod.REBUILD_FOLDER = Path.Combine(mod.ISO_PATH, "ctr_rebuild");
 
@@ -1274,7 +1349,7 @@ namespace Crash_Team_Mod
                         args = $"\"{Path.Combine(mod.REBUILD_FOLDER, "bigfile.big")}\"";
                         execute_process(6, filename, args, mod.PREV_PSX_DIR); //bigtool
 
-                        MessageBox.Show("Rom succesfully extracted in:", mod.REBUILD_FOLDER);
+                        MessageBox.Show("Rom succesfully extracted in:" + mod.REBUILD_FOLDER);
                         break;
                     }
 
@@ -1290,6 +1365,8 @@ namespace Crash_Team_Mod
                             MessageBox.Show("Error! ctr_rebuild folder not exist.");
                             return;
                         }
+
+                        MessageBox.Show("Rebuilding the rom... pls wait");
 
                         //big tools args
                         filename = mod.BIGTOOL;
@@ -1317,6 +1394,10 @@ namespace Crash_Team_Mod
                             MessageBox.Show("cant find ctr_rebuild.bin");
                             return;
                         }
+                        else if (rom.Text == String.Empty || !File.Exists(rom.Text))
+                        {
+                            MessageBox.Show("first select a vanilla rom to make the xdelta");
+                        }
 
                         //xdelta args
                         filename = xdelta3;
@@ -1343,7 +1424,7 @@ namespace Crash_Team_Mod
                         //lng2txt args
                         filename = lng2text;
                         args = $" \"{mod.LNG_PATH}\"";
-                        execute_process(6, filename, args, mod.LNG_PATH); //convert .lng to .txt & .txt to .lng
+                        execute_process(6, filename, args, Directory.GetParent(mod.LNG_PATH).FullName); //convert .lng to .txt & .txt to .lng
 
                         MessageBox.Show("LNG succesfully converted");
 
@@ -1360,11 +1441,12 @@ namespace Crash_Team_Mod
                         }
 
                         string model_reader = Path.GetFullPath(Path.Combine(Path.Combine(mod.CTR_TOOLS_PATH, "ctrtools"), "model_reader.exe"));
+                        MessageBox.Show(model_reader);
 
                         //model_reader args
                         filename = model_reader;
                         args = $"\"{mod.MODEL_PATH}\"";
-                        execute_process(6, filename, args, mod.MODEL_PATH); //convert .ply to .ctr & .ctr to .obj
+                        execute_process(6, filename, args, Directory.GetParent(mod.MODEL_PATH).FullName); //convert .ply to .ctr & .ctr to .obj
 
                         MessageBox.Show("model succesfully converted");
 
@@ -1421,7 +1503,7 @@ namespace Crash_Team_Mod
             ctr_tools_funcs((byte)modding_tools.XDELTA);
         }
 
-        private void tools_advanced(object sender, EventArgs e) 
+        private void tools_advanced(object sender, EventArgs e)
         {
             switch_gui((byte)gui.ADVANCED);
         }
