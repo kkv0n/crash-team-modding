@@ -959,7 +959,7 @@ namespace Crash_Team_Mod
                 return;
             }
 
-            create_log();
+            
 
             // get the path of buildList.txt
             string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -984,7 +984,9 @@ namespace Crash_Team_Mod
 
             //update txt paths
             change_paths((byte)paths.WRITE_PATHS);
-
+            
+            create_log();
+            
             //open buildlist
             psx_execute((byte)psx.OPEN);
 
@@ -1229,13 +1231,15 @@ namespace Crash_Team_Mod
                 }
             }
 
-            create_log();
+            
 
             rom.Text = Path.Combine(mod.ISO_PATH, mod.NAME_ROM);
 
             //check if the folder have spaces
             psx_execute((byte)psx.TEMP_PATH);
 
+            create_log();
+            
             //open the buildList
             psx_execute((byte)psx.OPEN);
             active_buildlist = true;
